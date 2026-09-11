@@ -6,48 +6,107 @@ Developed for the **Kurukshetra Hackathon**.
 
 ---
 
-## 🌟 Key Features
+## 📜 Complete Changelog & Architecture Evolution
 
-### 1. Fast, Friction-Free Identification (`WelcomeScreen`)
-- **Zero Sign-in Friction**: In urgent emergency situations, speed saves lives. Users can enter their name or proceed immediately as **"Unknown Person"** with a single tap.
-- **Role-Based Context Switching**:
-  - **Civilian**: Tailored for citizens seeking urgent assistance, reporting local hazards, and navigating to safe shelters.
-  - **First Responder**: Tailored for emergency personnel needing dispatch channels, priority alerts, and field coordination.
-- **Smooth Spring Role Toggle**: Fluid animated indicator with spring curve physics and high-contrast glowing badges.
-- **Pre-filled Autofill Memory**: Preserves the user's name and role across sessions and after logout for instant re-entry.
-- **Viewport-Adaptive Layout**: Guaranteed single-screen presentation with zero vertical scrolling across all standard phone viewports.
-- **Early Permission Acquisition**: Non-blocking location permission request triggered at app startup to pre-warm the location cache and optimize response times.
+A detailed summary of all features, enhancements, and architectural upgrades implemented across the application:
 
-### 2. Comprehensive Incident Reporting Form (`IncidentReportScreen`)
-- **Scrollable Emergency Form**: Structured, clear inputs designed for high-stress operation.
-- **Disaster Type Dropdown**: Categorizes the emergency with dedicated visual indicators:
+### 1. Friction-Free Onboarding & Authentication (`lib/welcome_screen.dart`)
+- **Dark Theme Transformation**: Migrated entire visual hierarchy from basic white layout to an emergency-tailored dark theme (`#0B0F19`, `#131B2E`, `#EF4444`).
+- **Zero-Friction Identity Fallback**: Submitting an empty name automatically defaults to **"Unknown Person"** for rapid, unblocked emergency dispatch.
+- **Persistent Autofill Memory**: User name and role selections persist across app restarts and after logout, allowing instant re-entry.
+- **Viewport-Adaptive Single-Screen Layout**: Removed all vertical scrolling from the welcome screen, guaranteeing a single-view presentation without layout clipping on any standard phone viewport.
+- **Tactile Role Selector**: Animated spring selector for switching between **Civilian** and **First Responder** roles with glowing badges.
+- **Pulsing Status Shield**: Fluid breathing animation with `RepaintBoundary` isolation to minimize GPU/CPU cycles.
+
+### 2. Session Persistence & Navigation Flow (`lib/main.dart`, `lib/services/storage_service.dart`)
+- **Centralized `StorageService`**: Singleton service encapsulating `SharedPreferences` with defensive type safety and backward-compatible key mapping (`user_name`, `user_role`, `is_logged_in`).
+- **Instant Session Restoration**: On app launch, the authentication state is evaluated before rendering; active sessions skip login and open `IncidentReportScreen` directly.
+- **Directional Navigation**: Removed redundant top-left back button from `IncidentReportScreen` to keep the incident dashboard focused and forward-directional.
+- **Top-Right Logout Action**: Allows responders and civilians to securely end their session while retaining saved profile credentials for quick autofill.
+
+### 3. Comprehensive Incident Reporting Form (`lib/incident_report_screen.dart`)
+- **Disaster Type Dropdown**: Visual classification menu with themed icons for:
   - 🌊 **Flood**
   - 🔥 **Fire**
   - 🌍 **Earthquake**
   - 🚑 **Medical**
-- **Dynamic Severity Slider**: 1 to 5 scale with real-time color gradations (Green -> Yellow -> Orange -> Deep Red) and status labels (`1 - Minor`, `2 - Moderate`, `3 - Significant`, `4 - Severe`, `5 - Critical`).
-- **Urgent Reporter Override**: "Urgent (Unknown)" button instantly sets identity to "Unknown Person" if reporting under extreme duress.
-- **Multi-Tier Live Geolocation (`LocationService`)**:
-  - **Tier 1 (Native GPS)**: Queries device hardware GPS via `geolocator` with high-accuracy positioning.
-  - **Tier 2 (HTTPS IP Geolocation)**: Primary failover via `https://ipwho.is/` (city, region, coordinates) if GPS hardware or permissions are unavailable.
-  - **Tier 3 (HTTP IP Failover)**: Secondary failover via `http://ip-api.com/json`.
-  - **Tier 4 (Offline Fallback)**: Resilient default emergency coordinates if network and GPS are completely inaccessible.
-  - **Dynamic Source Badges**: Real-time visual chip indicating coordinates provenance:
-    - 🟢 `LIVE GPS` (hardware GPS sensor locked)
-    - 🔵 `IP NETWORK` (network-resolved IP coordinates)
-    - 🟡 `CUSTOM` (manually entered/adjusted coordinates)
-    - ⚪ `DISPATCH FALLBACK` (offline default coordinates)
-- **Custom Coordinates Modal**: "Custom" button opens a sleek dialog enabling responders to manually enter or fine-tune exact disaster coordinates with numerical bounds validation (-90° to 90° latitude, -180° to 180° longitude).
-- **Multi-Select Resource Checklist**: Toggle chips for critical needs:
-  - 🚑 `Medical`
-  - 🍞 `Food`
-  - 🛟 `Rescue`
-  - 💧 `Water`
-- **Detailed Situation Description**: Multiline text area for tactical field observations, hazard alerts, or victim counts.
-- **Submitting & Loading State**: Animated submission button with loading spinner, validation, and error handling.
-- **Tactile Quick Action Tiles**: 4 rapid-access category shortcuts (Fire, Flood, Medical Aid, Safe Shelters) with spring physics and telemetry logging.
-- **Live Dispatch Radar Beacon**: Real-time pulsing radar wave (`_LiveRadarBeacon`) displaying telemetry and emergency status.
-- **Secure Session Management**: Top-right profile and logout button securely ends the session while retaining credentials for autofill.
+- **Dynamic Severity Slider (1 to 5)**: Real-time slider with color-coded gradations (Green $\rightarrow$ Cyan $\rightarrow$ Amber $\rightarrow$ Orange $\rightarrow$ Red) and contextual threat level labels (`Minor`, `Moderate`, `Significant`, `Severe`, `Critical`).
+- **Urgent Reporter Override**: Integrated **"Urgent (Unknown)"** quick button to set identity to "Unknown Person" immediately under high-stress field conditions.
+- **Multiline Tactical Description**: Form field with dark slate styling, rounded focus borders, and emergency red accents for situation details.
+- **Resources Needed Multi-Select**: Responsive toggle chips for `Medical`, `Food`, `Rescue`, and `Water` with active/inactive neon highlights.
+- **Staggered Action Cards**: 4 quick-action category shortcuts with staggered entrance animations (`380ms` – `860ms`) and responsive press-down physics (`0.95x` scaling).
+- **Live Dispatch Radar Beacon (`_LiveRadarBeacon`)**: Real-time pulsing circular radar waves showing active telemetry monitoring.
+
+### 4. Incident Data Model & REST API Integration (`lib/models/`, `lib/services/incident_api_service.dart`)
+- **Strict Data Model (`IncidentReport`)**: Conforms to the required JSON schema:
+  `{reporter_name, disaster_type, severity_level, latitude, longitude, description, resources_needed}`.
+- **REST API Dispatch**: Sends `POST` requests to `https://my-render-api.com/api/incident` using the `http` package.
+- **Network Resilience**:
+  - 10-second request timeout handling via `TimeoutException`.
+  - HTTP error code inspection (`200 OK` vs `4xx/5xx`).
+  - Offline local fallback logging via `StorageService.logIncident`.
+- **Dependency Injection**: Accepts optional `http.Client` for fast, zero-flakiness automated testing.
+
+### 5. Native GPS, Permissions & Geolocation Pipeline (`lib/services/location_service.dart`)
+- **Native Device GPS (`geolocator: ^14.0.3`)**: Real satellite GPS positioning for physical mobile devices.
+- **Platform Permissions**:
+  - Android (`android/app/src/main/AndroidManifest.xml`): `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`, `INTERNET`.
+  - iOS (`ios/Runner/Info.plist`): `NSLocationWhenInUseUsageDescription`.
+- **Startup Permission Check & Pre-Warming**:
+  - Automatically queries location permissions non-blockingly at app launch in `main.dart`.
+  - Pre-warms the location cache so coordinates are already loaded when entering the form.
+  - Implements a 2-minute cache validity window to eliminate redundant battery-draining GPS queries.
+- **4-Tier Geolocation Failover**:
+  1. **Tier 1 (Native GPS)**: Hardware sensor satellite fix via `geolocator`.
+  2. **Tier 2 (HTTPS IP Geolocation)**: Automatic failover to `https://ipwho.is/` (retrieving latitude, longitude, city, and region).
+  3. **Tier 3 (HTTP IP Failover)**: Secondary failover to `http://ip-api.com/json`.
+  4. **Tier 4 (Offline Fallback)**: Resilient default emergency dispatch coordinates.
+- **Real-Time Provenance Badges**:
+  - 🟢 `LIVE GPS` — Hardware satellite fix locked.
+  - 🔵 `IP NETWORK` — Network-resolved coordinates with city/region readout.
+  - 🟡 `CUSTOM` — Manually specified coordinates.
+  - ⚪ `DISPATCH FALLBACK` — Default offline coordinates.
+- **Custom Coordinates Modal**: "Custom" button opens an interactive dialog to type or fine-tune exact disaster coordinates with numerical bounds validation (-90° to 90° latitude, -180° to 180° longitude).
+
+### 6. Performance, Layout & Accessibility Optimizations
+- **Zero `RenderFlex` Overflows**:
+  - Wrapped all SnackBar content text in `Expanded` with `maxLines: 2` and `overflow: TextOverflow.ellipsis`, fixing overflow crashes on 1.25x+ text scaling.
+  - Replaced rigid `Row` layouts (Reporter Name header, Severity slider header, Location header) with responsive `Wrap` widgets.
+- **Repaint Layer Isolation**:
+  - Wrapped continuous looping animations (`_pulse`, `_buttonGlowController`, `_LiveRadarBeacon`) with `RepaintBoundary` to prevent invalidating entire screen layers and preserve device battery.
+- **Render Tree Optimization**:
+  - Replaced dynamic nested builders with direct `SlideTransition` and `FadeTransition` controllers for smooth 60/120 FPS animations.
+
+### 7. Automated Test Suite (`test/widget_test.dart`)
+- Expanded test suite to **18 automated unit, widget, mock API, location, and accessibility tests**.
+- Maintained **0 errors and 0 warnings** under `flutter analyze`.
+
+---
+
+## 🌟 Key Features
+
+### Fast, Friction-Free Identification (`WelcomeScreen`)
+- **Zero Sign-in Friction**: Users can enter their name or proceed immediately as **"Unknown Person"** with a single tap.
+- **Role-Based Context Switching**:
+  - **Civilian**: Seeking urgent assistance, reporting local hazards, and navigating to safe shelters.
+  - **First Responder**: Priority dispatch channels, alerts, and field coordination.
+- **Smooth Spring Role Toggle**: Fluid animated indicator with spring curve physics and high-contrast glowing badges.
+- **Pre-filled Autofill Memory**: Preserves user name and role across sessions and after logout for instant re-entry.
+- **Viewport-Adaptive Layout**: Single-screen presentation with zero vertical scrolling across standard phone viewports.
+- **Early Permission Acquisition**: Non-blocking location permission request triggered at app startup to pre-warm the location cache.
+
+### Comprehensive Incident Reporting Form (`IncidentReportScreen`)
+- **Scrollable Emergency Form**: Structured, clear inputs designed for high-stress operation.
+- **Disaster Type Dropdown**: Categorizes the emergency with dedicated visual indicators (Flood, Fire, Earthquake, Medical).
+- **Dynamic Severity Slider**: 1 to 5 scale with real-time color gradations and status labels.
+- **Urgent Reporter Override**: "Urgent (Unknown)" button instantly sets identity to "Unknown Person".
+- **Multi-Tier Live Geolocation (`LocationService`)**: Hardware GPS $\rightarrow$ HTTPS IP Geolocation $\rightarrow$ HTTP Geolocation $\rightarrow$ Offline Defaults.
+- **Dynamic Source Badges**: `LIVE GPS`, `IP NETWORK`, `CUSTOM`, `DISPATCH FALLBACK`.
+- **Custom Coordinates Modal**: Allows responders to manually enter or fine-tune exact coordinates with bounds validation.
+- **Multi-Select Resource Checklist**: Toggle chips for `Medical`, `Food`, `Rescue`, `Water`.
+- **Tactile Quick Action Tiles**: 4 category shortcuts with spring physics and telemetry logging.
+- **Live Dispatch Radar Beacon**: Real-time pulsing radar wave displaying telemetry and emergency status.
+- **Secure Session Management**: Top-right profile and logout button securely ends session while retaining autofill credentials.
 
 ---
 
@@ -81,7 +140,7 @@ Reports strictly conform to the required JSON payload specification:
 - **Dependency Injection**: Accepts an optional `http.Client` for testability and mock responses.
 
 ### Location Service (`LocationService`)
-- **Native GPS**: Utilizes `geolocator` (`14.0.3`) for hardware satellite coordinates.
+- **Native GPS**: Utilizes `geolocator` (`^14.0.3`) for hardware satellite coordinates.
 - **Permissions**:
   - Android: `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`, `INTERNET`.
   - iOS: `NSLocationWhenInUseUsageDescription`.
