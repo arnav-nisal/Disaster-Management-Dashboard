@@ -75,3 +75,5 @@ The state management in `src/context/DisasterContext.tsx` is structured specific
    }, []);
    ```
 3. Map `submitHumanOverride` directly to `updateDoc(doc(db, 'incidents', payload.incidentId), ...)` and `addDoc(collection(db, 'audit_logs'), ...)`.
+
+ v2

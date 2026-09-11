@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ChevronLeft } from 'lucide-react';
 import { useDisaster } from './context/DisasterContext';
 import { Header } from './components/header/Header';
@@ -8,6 +8,7 @@ import { AuditLogSidebar } from './components/sidebar/AuditLogSidebar';
 import { HumanOverrideModal } from './components/modals/HumanOverrideModal';
 import { GeneralDetailsModal } from './components/modals/GeneralDetailsModal';
 import { ToastContainer } from './components/common/ToastContainer';
+import { WelcomePage } from './components/welcome/WelcomePage';
 
 export const AppContent: React.FC = () => {
   const {
@@ -100,5 +101,28 @@ export const AppContent: React.FC = () => {
 };
 
 export default function App() {
-  return <AppContent />;
+  const [showDashboard, setShowDashboard] = useState(false);
+  const [dashVisible, setDashVisible] = useState(false);
+
+  const handleEnter = () => {
+    setShowDashboard(true);
+    // Slight delay so the welcome exit animation runs first
+    setTimeout(() => setDashVisible(true), 80);
+  };
+
+  if (!showDashboard) {
+    return <WelcomePage onEnter={handleEnter} />;
+  }
+
+  return (
+    <div
+      style={{
+        opacity: dashVisible ? 1 : 0,
+        transform: dashVisible ? 'translateY(0)' : 'translateY(8px)',
+        transition: 'opacity 0.55s ease, transform 0.55s cubic-bezier(0.16,1,0.3,1)',
+      }}
+    >
+      <AppContent />
+    </div>
+  );
 }
