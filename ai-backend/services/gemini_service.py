@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import logging
 from typing import Optional, Dict, Any
@@ -25,87 +26,83 @@ except ImportError:
 
 try:
     from openai import OpenAI
-    OPENAI_AVAILABLE = True
+    NVIDIA_AVAILABLE = True
 except ImportError:
-    OPENAI_AVAILABLE = False
+    NVIDIA_AVAILABLE = False
 
 
 class GeminiService:
     """
-    Multi-provider AI service supporting:
-    - Attempt 1: Groq (llama-3.3-70b-versatile)
-    - Attempt 2: Gemini (gemini-2.0-flash / gemini-2.5-flash)
-    - Attempt 3: NVIDIA NIM (meta/llama-3.1-70b-instruct)
-    - Attempt 4: Deterministic rule-based fallback
+    Multi-provider AI text generation fallback:
+    Attempt 1: Groq (llama-3.3-70b-versatile)
+    Attempt 2: Gemini (gemini-2.0-flash via google-genai SDK)
+    Attempt 3: NVIDIA NIM (meta/llama-3.1-70b-instruct)
+    Final fallback: Deterministic rule-based engines.
     """
 
     def __init__(self):
-        # 1. Groq Client
-        groq_key = os.getenv("GROQ_API_KEY")
+        # Groq setup
+        self.groq_key = os.getenv("GROQ_API_KEY")
         self.groq_client = None
-        if GROQ_AVAILABLE and groq_key and groq_key != "your_groq_api_key_here":
+        if GROQ_AVAILABLE and self.groq_key:
             try:
-                self.groq_client = Groq(api_key=groq_key)
-                logger.info("Groq client initialized.")
+                self.groq_client = Groq(api_key=self.groq_key)
             except Exception as e:
-                logger.warning(f"Failed to initialize Groq: {e}")
+                logger.warning(f"Failed to initialize Groq client: {e}")
 
-        # 2. Gemini Client
-        gemini_key = os.getenv("GEMINI_API_KEY")
+        # Gemini setup (using google-genai)
+        self.gemini_key = os.getenv("GEMINI_API_KEY")
         self.gemini_client = None
-        if GENAI_AVAILABLE and gemini_key and gemini_key != "your_gemini_api_key_here":
+        if GENAI_AVAILABLE and self.gemini_key:
             try:
-                self.gemini_client = genai.Client(api_key=gemini_key)
-                logger.info("Gemini client initialized.")
+                self.gemini_client = genai.Client(api_key=self.gemini_key)
             except Exception as e:
-                logger.warning(f"Failed to initialize Gemini: {e}")
+                logger.warning(f"Failed to initialize Gemini client: {e}")
 
-        # 3. NVIDIA Client
-        nvidia_key = os.getenv("NVIDIA_API_KEY")
+        # NVIDIA NIM setup (using OpenAI-compatible endpoint)
+        self.nvidia_key = os.getenv("NVIDIA_API_KEY")
         self.nvidia_client = None
-        if OPENAI_AVAILABLE and nvidia_key and nvidia_key != "your_nvidia_api_key_here":
+        if NVIDIA_AVAILABLE and self.nvidia_key:
             try:
                 self.nvidia_client = OpenAI(
-                    api_key=nvidia_key,
-                    base_url="https://integrate.api.nvidia.com/v1"
+                    base_url="https://integrate.api.nvidia.com/v1",
+                    api_key=self.nvidia_key
                 )
-                logger.info("NVIDIA NIM client initialized.")
             except Exception as e:
-                logger.warning(f"Failed to initialize NVIDIA NIM: {e}")
+                logger.warning(f"Failed to initialize NVIDIA NIM client: {e}")
 
     def generate_text_fallback(self, prompt: str) -> Dict[str, str]:
         """
-        Executes cascading multi-provider text generation:
-        Attempt 1: Groq -> Attempt 2: Gemini -> Attempt 3: NVIDIA NIM.
+        Generic prompt fallback cascade: Groq -> Gemini -> NVIDIA NIM.
         """
-        # --- ATTEMPT 1: GROQ ---
+        # Attempt 1: Groq
         if self.groq_client:
             try:
-                logger.info("Attempting Groq...")
+                logger.info("Attempting Groq text generation...")
                 response = self.groq_client.chat.completions.create(
                     messages=[{"role": "user", "content": prompt}],
                     model="llama-3.3-70b-versatile"
                 )
                 return {"provider": "groq", "response": response.choices[0].message.content}
             except Exception as e:
-                logger.warning(f"Groq failed: {str(e)}")
+                logger.error(f"Groq failed: {str(e)}")
 
-        # --- ATTEMPT 2: GEMINI ---
+        # Attempt 2: Gemini
         if self.gemini_client:
             try:
-                logger.info("Attempting Gemini fallback...")
+                logger.info("Attempting Gemini text generation...")
                 response = self.gemini_client.models.generate_content(
                     model="gemini-2.0-flash",
                     contents=prompt
                 )
                 return {"provider": "gemini", "response": response.text}
             except Exception as e:
-                logger.warning(f"Gemini failed: {str(e)}")
+                logger.error(f"Gemini failed: {str(e)}")
 
-        # --- ATTEMPT 3: NVIDIA NIM ---
+        # Attempt 3: NVIDIA NIM
         if self.nvidia_client:
             try:
-                logger.info("Attempting NVIDIA fallback...")
+                logger.info("Attempting NVIDIA text generation...")
                 response = self.nvidia_client.chat.completions.create(
                     messages=[{"role": "user", "content": prompt}],
                     model="meta/llama-3.1-70b-instruct"
@@ -123,12 +120,11 @@ class GeminiService:
         prompt = f"""
 You are an emergency response triage coordinator. Analyze this disaster incident and return ONLY valid JSON:
 Disaster Type: {incident.disaster_type}
-Severity Rating (1-10): {incident.severity_scale}
+Reporter Name: {incident.reporter_name}
+Severity Level (1-10): {incident.severity_level}
 Latitude: {incident.latitude}, Longitude: {incident.longitude}
-Location: {incident.location}
-Affected Count: {incident.affected_count}
-Requested Resources: {json.dumps(incident.requested_resources)}
 Description: {incident.description}
+Resources Needed: {json.dumps(incident.resources_needed)}
 Is Duplicate: {is_duplicate}
 
 Schema:
@@ -216,12 +212,17 @@ Schema:
         return f"Deploy emergency units immediately to {loc_str} for {category} response with committed assets ({res_summary}) under Priority {priority} protocol."
 
     def _rule_based_triage(self, incident: IncidentCreate, is_duplicate: bool = False, fallback_reason: Optional[str] = None) -> TriageAssessment:
-        base_score = incident.severity_scale * 7
-        if incident.affected_count > 500:
+        base_score = incident.severity_level * 7
+        affected_count = getattr(incident, "affected_count", 0)
+        if affected_count > 500:
             count_factor = 25
-        elif incident.affected_count > 100:
+        elif affected_count > 100:
             count_factor = 18
-        elif incident.affected_count > 20:
+        elif affected_count > 20:
+            count_factor = 10
+        elif incident.severity_level >= 8:
+            count_factor = 15
+        elif incident.severity_level >= 5:
             count_factor = 10
         else:
             count_factor = 5
@@ -234,34 +235,53 @@ Schema:
         if is_duplicate:
             calculated_priority = max(1, calculated_priority - 20)
 
-        if calculated_priority >= 80 or incident.severity_scale >= 8:
+        if calculated_priority >= 80 or incident.severity_level >= 8:
             urgency_level = "Critical"
-        elif calculated_priority >= 60 or incident.severity_scale >= 6:
+        elif calculated_priority >= 60 or incident.severity_level >= 6:
             urgency_level = "High"
-        elif calculated_priority >= 40 or incident.severity_scale >= 4:
+        elif calculated_priority >= 40 or incident.severity_level >= 4:
             urgency_level = "Medium"
         else:
             urgency_level = "Low"
 
+        # Map resources_needed (list of strings) to verified_needs (Dict[str, int])
         standard_keys = ["food", "water", "medical", "rescue"]
+        parsed_needs: Dict[str, int] = {}
+        default_resource_qtys = {
+            "food": max(10, incident.severity_level * 20),
+            "water": max(20, incident.severity_level * 40),
+            "medical": max(5, incident.severity_level * 5),
+            "rescue": max(2, int(incident.severity_level * 2))
+        }
+
+        for item in incident.resources_needed:
+            if not isinstance(item, str):
+                continue
+            item_clean = item.strip()
+            if not item_clean:
+                continue
+            match = re.match(r"^([a-zA-Z_]+)\s*[:=]\s*(\d+)$", item_clean)
+            if match:
+                res_key = match.group(1).lower()
+                parsed_needs[res_key] = int(match.group(2))
+            else:
+                res_key = item_clean.lower()
+                parsed_needs[res_key] = default_resource_qtys.get(res_key, 10)
+
         verified_needs = {}
         for key in standard_keys:
-            requested = incident.requested_resources.get(key, 0)
-            if requested > 0:
-                verified_needs[key] = int(requested)
+            if key in parsed_needs:
+                verified_needs[key] = parsed_needs[key]
             else:
-                if key == "medical" and urgency_level in ["Critical", "High"]:
-                    verified_needs[key] = max(5, int(incident.affected_count * 0.2))
-                elif key == "rescue" and urgency_level == "Critical":
-                    verified_needs[key] = max(3, int(incident.affected_count * 0.1))
-                elif key in ["food", "water"] and incident.affected_count > 0:
-                    verified_needs[key] = max(10, incident.affected_count)
-                else:
-                    verified_needs[key] = 0
+                verified_needs[key] = 0
+
+        for key, val in parsed_needs.items():
+            if key not in verified_needs:
+                verified_needs[key] = val
 
         reason = (
-            f"Rule-based triage applied: Severity {incident.severity_scale}/10, "
-            f"Affected: {incident.affected_count}, Priority: {calculated_priority}/100."
+            f"Rule-based triage applied: Severity {incident.severity_level}/10, "
+            f"Reporter: {incident.reporter_name}, Priority: {calculated_priority}/100."
         )
         if is_duplicate:
             reason += " Flagged as duplicate report in 500m proximity."
