@@ -1,5 +1,7 @@
 import 'dart:convert';
+
 import 'package:http/http.dart' as http;
+
 import '../models/incident_report.dart';
 
 /// Result object for incident submission API responses.
@@ -17,7 +19,7 @@ class IncidentSubmissionResult {
 
 /// Service handling API interactions for Incident Reports.
 class IncidentApiService {
-  static const String endpointUrl = 'https://my-render-api.com/api/incident';
+  static const String endpointUrl = 'http://127.0.0.1:8000/api/incidents';
 
   final http.Client _client;
 

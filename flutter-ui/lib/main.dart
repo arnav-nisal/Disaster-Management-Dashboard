@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+
 import 'welcome_screen.dart';
 import 'incident_report_screen.dart';
 
 import 'services/storage_service.dart';
-import 'services/location_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -13,14 +13,13 @@ void main() async {
   final savedName = await storage.getUserName();
   final savedRole = await storage.getUserRole();
 
-  // Request location permission at app startup and pre-warm location
-  LocationService().requestStartupPermission();
-
-  runApp(MyApp(
-    initialIsLoggedIn: isLoggedIn && (savedName != null),
-    initialUserName: savedName,
-    initialUserRole: savedRole,
-  ));
+  runApp(
+    MyApp(
+      initialIsLoggedIn: isLoggedIn && (savedName != null),
+      initialUserName: savedName,
+      initialUserRole: savedRole,
+    ),
+  );
 }
 
 class MyApp extends StatefulWidget {
@@ -113,10 +112,7 @@ class _MyAppState extends State<MyApp> {
         ),
       ),
       home: _isLoggedIn
-          ? IncidentReportScreen(
-              userName: _userName,
-              userRole: _userRole,
-            )
+          ? IncidentReportScreen(userName: _userName, userRole: _userRole)
           : const WelcomeScreen(),
     );
   }

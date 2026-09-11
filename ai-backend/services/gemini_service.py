@@ -77,27 +77,29 @@ class GeminiService:
         """
         # Attempt 1: Groq
         if self.groq_client:
-            try:
-                logger.info("Attempting Groq text generation...")
-                response = self.groq_client.chat.completions.create(
-                    messages=[{"role": "user", "content": prompt}],
-                    model="llama-3.3-70b-versatile"
-                )
-                return {"provider": "groq", "response": response.choices[0].message.content}
-            except Exception as e:
-                logger.error(f"Groq failed: {str(e)}")
+            for model_name in ["openai/gpt-oss-120b", "llama-3.3-70b-versatile", "qwen/qwen3.8-27b"]:
+                try:
+                    logger.info(f"Attempting Groq text generation with {model_name}...")
+                    response = self.groq_client.chat.completions.create(
+                        messages=[{"role": "user", "content": prompt}],
+                        model=model_name
+                    )
+                    return {"provider": "groq", "response": response.choices[0].message.content}
+                except Exception as e:
+                    logger.warning(f"Groq ({model_name}) failed: {str(e)}")
 
         # Attempt 2: Gemini
         if self.gemini_client:
-            try:
-                logger.info("Attempting Gemini text generation...")
-                response = self.gemini_client.models.generate_content(
-                    model="gemini-2.0-flash",
-                    contents=prompt
-                )
-                return {"provider": "gemini", "response": response.text}
-            except Exception as e:
-                logger.error(f"Gemini failed: {str(e)}")
+            for model_name in ["gemini-3.6-flash", "gemini-flash-latest", "gemini-2.5-flash", "gemini-2.0-flash"]:
+                try:
+                    logger.info(f"Attempting Gemini text generation with {model_name}...")
+                    response = self.gemini_client.models.generate_content(
+                        model=model_name,
+                        contents=prompt
+                    )
+                    return {"provider": "gemini", "response": response.text}
+                except Exception as e:
+                    logger.warning(f"Gemini ({model_name}) failed: {str(e)}")
 
         # Attempt 3: NVIDIA NIM
         if self.nvidia_client:
@@ -151,32 +153,45 @@ Schema:
     def _try_groq_triage(self, prompt: str, is_duplicate: bool) -> Optional[TriageAssessment]:
         if not self.groq_client:
             return None
-        logger.info("Attempting Groq for triage...")
-        res = self.groq_client.chat.completions.create(
-            messages=[{"role": "user", "content": prompt}],
-            model="llama-3.3-70b-versatile",
-            response_format={"type": "json_object"}
-        )
-        data = json.loads(res.choices[0].message.content)
-        data["is_duplicate"] = is_duplicate
-        return TriageAssessment(**data)
+        for model_name in ["openai/gpt-oss-120b", "llama-3.3-70b-versatile", "qwen/qwen3.8-27b"]:
+            try:
+                logger.info(f"Attempting Groq for triage with {model_name}...")
+                res = self.groq_client.chat.completions.create(
+                    messages=[{"role": "user", "content": prompt}],
+                    model=model_name,
+                    response_format={"type": "json_object"}
+                )
+                data = json.loads(res.choices[0].message.content)
+                data["is_duplicate"] = is_duplicate
+                return TriageAssessment(**data)
+            except Exception as e:
+                logger.warning(f"Groq triage ({model_name}) failed: {e}")
+        return None
 
     def _try_gemini_triage(self, prompt: str, is_duplicate: bool) -> Optional[TriageAssessment]:
         if not self.gemini_client:
             return None
-        logger.info("Attempting Gemini for triage...")
-        res = self.gemini_client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=TriageAssessment,
-                temperature=0.1
-            )
-        )
-        data = json.loads(res.text.strip())
-        data["is_duplicate"] = is_duplicate
-        return TriageAssessment(**data)
+        for model_name in ["gemini-3.6-flash", "gemini-flash-latest", "gemini-2.5-flash", "gemini-2.0-flash"]:
+            try:
+                logger.info(f"Attempting Gemini for triage with {model_name}...")
+                res = self.gemini_client.models.generate_content(
+                    model=model_name,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        temperature=0.1
+                    )
+                )
+                raw_text = res.text.strip()
+                if raw_text.startswith("```"):
+                    raw_text = re.sub(r"^```(?:json)?\s*", "", raw_text)
+                    raw_text = re.sub(r"\s*```$", "", raw_text)
+                data = json.loads(raw_text)
+                data["is_duplicate"] = is_duplicate
+                return TriageAssessment(**data)
+            except Exception as e:
+                logger.warning(f"Gemini triage ({model_name}) failed: {e}")
+        return None
 
     def _try_nvidia_triage(self, prompt: str, is_duplicate: bool) -> Optional[TriageAssessment]:
         if not self.nvidia_client:

@@ -8,8 +8,8 @@ A robust, production-ready FastAPI microservice designed for real-time disaster 
 
 ### 1. Multi-Model AI Cascading Fallback (`/generate` & Incident Triage)
 Ensures zero-downtime AI triage and tactical briefing with a cascading multi-tier failover:
-- **Attempt 1 (Primary / Ultra Low Latency)**: **Groq** via `llama-3.3-70b-versatile`.
-- **Attempt 2 (First Fallback)**: **Google GenAI** via `gemini-2.0-flash`.
+- **Attempt 1 (Primary / Ultra Low Latency)**: **Groq** (supporting `openai/gpt-oss-120b`, `llama-3.3-70b-versatile`, and `qwen/qwen3.8-27b`).
+- **Attempt 2 (First Fallback)**: **Google GenAI** (supporting `gemini-3.6-flash`, `gemini-flash-latest`, and `gemini-2.5-flash`).
 - **Attempt 3 (Second Fallback)**: **NVIDIA NIM** via `meta/llama-3.1-70b-instruct` (hosted on `https://integrate.api.nvidia.com/v1`).
 - **Emergency Final Fallback**: Deterministic rule-based scoring engine that computes priority, urgency, and resource requirements even during complete network or API provider outages.
 
