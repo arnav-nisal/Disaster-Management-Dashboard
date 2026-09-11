@@ -74,9 +74,10 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isFirstResponder = _selectedRole == 'First Responder';
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFF0B0F19),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -93,19 +94,19 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                     // Brand Emblem
                     Center(
                       child: Container(
-                        width: 72,
-                        height: 72,
+                        width: 74,
+                        height: 74,
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
                             colors: [Color(0xFFDC2626), Color(0xFFEA580C)],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(22),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFFDC2626).withValues(alpha: 0.32),
-                              blurRadius: 16,
+                              color: const Color(0xFFDC2626).withValues(alpha: 0.35),
+                              blurRadius: 20,
                               offset: const Offset(0, 8),
                             ),
                           ],
@@ -117,7 +118,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 20),
 
                     // App Title & Tagline
                     Text(
@@ -125,7 +126,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                       textAlign: TextAlign.center,
                       style: theme.textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.w800,
-                        color: const Color(0xFF0F172A),
+                        color: Colors.white,
                         letterSpacing: -0.5,
                       ),
                     ),
@@ -134,24 +135,24 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                       'Emergency response coordination & rapid incident reporting network',
                       textAlign: TextAlign.center,
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: const Color(0xFF64748B),
+                        color: const Color(0xFF94A3B8),
                         height: 1.35,
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 26),
 
-                    // Form Container Card
+                    // Dark Themed Form Container Card
                     Container(
-                      padding: const EdgeInsets.all(20),
+                      padding: const EdgeInsets.all(22),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: const Color(0xFF131B2E),
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        border: Border.all(color: const Color(0xFF1E293B)),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.04),
-                            blurRadius: 14,
-                            offset: const Offset(0, 6),
+                            color: Colors.black.withValues(alpha: 0.35),
+                            blurRadius: 18,
+                            offset: const Offset(0, 8),
                           ),
                         ],
                       ),
@@ -163,7 +164,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                             style: TextStyle(
                               fontSize: 17,
                               fontWeight: FontWeight.w700,
-                              color: Color(0xFF0F172A),
+                              color: Colors.white,
                             ),
                           ),
                           const SizedBox(height: 2),
@@ -171,7 +172,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                             'No login required. Enter details to access incident reporting.',
                             style: TextStyle(
                               fontSize: 12,
-                              color: Color(0xFF64748B),
+                              color: Color(0xFF94A3B8),
                             ),
                           ),
                           const SizedBox(height: 18),
@@ -182,22 +183,27 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
-                              color: Color(0xFF334155),
+                              color: Color(0xFFCBD5E1),
                             ),
                           ),
                           const SizedBox(height: 6),
                           TextFormField(
                             controller: _nameController,
                             textCapitalization: TextCapitalization.words,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                            ),
+                            cursorColor: const Color(0xFFEF4444),
                             decoration: InputDecoration(
                               hintText: 'Enter your Name',
-                              hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                              hintStyle: const TextStyle(color: Color(0xFF64748B)),
                               prefixIcon: const Icon(
                                 Icons.person_outline_rounded,
-                                color: Color(0xFF64748B),
+                                color: Color(0xFF94A3B8),
                               ),
                               filled: true,
-                              fillColor: const Color(0xFFF8FAFC),
+                              fillColor: const Color(0xFF0F172A),
                               contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 14,
                                 vertical: 14,
@@ -205,24 +211,24 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide:
-                                    const BorderSide(color: Color(0xFFCBD5E1)),
+                                    const BorderSide(color: Color(0xFF334155)),
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: const BorderSide(
-                                  color: Color(0xFFDC2626),
+                                  color: Color(0xFFEF4444),
                                   width: 1.8,
                                 ),
                               ),
                               errorBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide:
-                                    BorderSide(color: Colors.red.shade400),
+                                    const BorderSide(color: Color(0xFFF87171)),
                               ),
                               focusedErrorBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: const BorderSide(
-                                  color: Color(0xFFDC2626),
+                                  color: Color(0xFFEF4444),
                                   width: 1.8,
                                 ),
                               ),
@@ -245,27 +251,33 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
-                              color: Color(0xFF334155),
+                              color: Color(0xFFCBD5E1),
                             ),
                           ),
                           const SizedBox(height: 6),
                           DropdownButtonFormField<String>(
                             initialValue: _selectedRole,
+                            dropdownColor: const Color(0xFF1E293B),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
                             items: _roleOptions.map((role) {
-                              final isResponder = role == 'First Responder';
+                              final isResp = role == 'First Responder';
                               return DropdownMenuItem<String>(
                                 value: role,
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Icon(
-                                      isResponder
+                                      isResp
                                           ? Icons.emergency_rounded
                                           : Icons.volunteer_activism_outlined,
                                       size: 18,
-                                      color: isResponder
-                                          ? const Color(0xFFDC2626)
-                                          : const Color(0xFF2563EB),
+                                      color: isResp
+                                          ? const Color(0xFFEF4444)
+                                          : const Color(0xFF60A5FA),
                                     ),
                                     const SizedBox(width: 8),
                                     Text(
@@ -273,7 +285,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                                       style: const TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.w500,
-                                        color: Color(0xFF1E293B),
+                                        color: Color(0xFFF1F5F9),
                                       ),
                                     ),
                                   ],
@@ -290,10 +302,10 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                             decoration: InputDecoration(
                               prefixIcon: const Icon(
                                 Icons.badge_outlined,
-                                color: Color(0xFF64748B),
+                                color: Color(0xFF94A3B8),
                               ),
                               filled: true,
-                              fillColor: const Color(0xFFF8FAFC),
+                              fillColor: const Color(0xFF0F172A),
                               contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 14,
                                 vertical: 14,
@@ -301,12 +313,12 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide:
-                                    const BorderSide(color: Color(0xFFCBD5E1)),
+                                    const BorderSide(color: Color(0xFF334155)),
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: const BorderSide(
-                                  color: Color(0xFFDC2626),
+                                  color: Color(0xFFEF4444),
                                   width: 1.8,
                                 ),
                               ),
@@ -314,19 +326,19 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                           ),
                           const SizedBox(height: 14),
 
-                          // Role description pill
+                          // Role description pill (Dark Mode)
                           Container(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 12, vertical: 8),
                             decoration: BoxDecoration(
-                              color: _selectedRole == 'First Responder'
-                                  ? const Color(0xFFFEF2F2)
-                                  : const Color(0xFFEFF6FF),
+                              color: isFirstResponder
+                                  ? const Color(0xFF2A0D0D)
+                                  : const Color(0xFF0C213B),
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(
-                                color: _selectedRole == 'First Responder'
-                                    ? const Color(0xFFFECACA)
-                                    : const Color(0xFFBFDBFE),
+                                color: isFirstResponder
+                                    ? const Color(0xFF7F1D1D)
+                                    : const Color(0xFF1D4ED8),
                               ),
                             ),
                             child: Row(
@@ -334,21 +346,21 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                                 Icon(
                                   Icons.info_outline_rounded,
                                   size: 16,
-                                  color: _selectedRole == 'First Responder'
-                                      ? const Color(0xFFDC2626)
-                                      : const Color(0xFF2563EB),
+                                  color: isFirstResponder
+                                      ? const Color(0xFFEF4444)
+                                      : const Color(0xFF60A5FA),
                                 ),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
-                                    _selectedRole == 'First Responder'
+                                    isFirstResponder
                                         ? 'Access emergency dispatch, priority alerts & response tools.'
                                         : 'Report incidents, request assistance & view safe zones.',
                                     style: TextStyle(
                                       fontSize: 11.5,
-                                      color: _selectedRole == 'First Responder'
-                                          ? const Color(0xFF991B1B)
-                                          : const Color(0xFF1E40AF),
+                                      color: isFirstResponder
+                                          ? const Color(0xFFFECACA)
+                                          : const Color(0xFFBFDBFE),
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),
@@ -368,7 +380,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                                 backgroundColor: const Color(0xFFDC2626),
                                 foregroundColor: Colors.white,
                                 elevation: 2,
-                                shadowColor: const Color(0xFFDC2626).withValues(alpha: 0.4),
+                                shadowColor: const Color(0xFFDC2626).withValues(alpha: 0.45),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
@@ -417,7 +429,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                         const Icon(
                           Icons.phone_in_talk_rounded,
                           size: 15,
-                          color: Color(0xFF94A3B8),
+                          color: Color(0xFF64748B),
                         ),
                         const SizedBox(width: 6),
                         Flexible(
@@ -425,7 +437,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                             'Life danger? Call emergency services (911 / 112)',
                             textAlign: TextAlign.center,
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: const Color(0xFF64748B),
+                              color: const Color(0xFF94A3B8),
                               fontWeight: FontWeight.w500,
                             ),
                           ),

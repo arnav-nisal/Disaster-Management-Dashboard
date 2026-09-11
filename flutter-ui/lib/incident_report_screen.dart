@@ -64,34 +64,44 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
     final isFirstResponder = _role == 'First Responder';
 
     return Scaffold(
+      backgroundColor: const Color(0xFF0B0F19),
       appBar: AppBar(
+        backgroundColor: const Color(0xFF0B0F19),
+        surfaceTintColor: Colors.transparent,
         title: const Text(
           'Incident Dashboard',
-          style: TextStyle(fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
         ),
         actions: [
           IconButton(
             tooltip: 'Switch Profile / Sign Out',
-            icon: const Icon(Icons.logout_rounded),
+            icon: const Icon(Icons.logout_rounded, color: Color(0xFF94A3B8)),
             onPressed: _handleLogout,
           ),
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFEF4444)),
+              ),
+            )
           : SafeArea(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // User status banner
+                    // User status banner (Dark Theme)
                     Container(
                       padding: const EdgeInsets.all(18),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: isFirstResponder
-                              ? [const Color(0xFFB91C1C), const Color(0xFFDC2626)]
+                              ? [const Color(0xFF991B1B), const Color(0xFFDC2626)]
                               : [const Color(0xFF1E3A8A), const Color(0xFF2563EB)],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
@@ -100,10 +110,10 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
                         boxShadow: [
                           BoxShadow(
                             color: (isFirstResponder
-                                    ? Colors.red
-                                    : Colors.blue)
-                                .withValues(alpha: 0.25),
-                            blurRadius: 12,
+                                    ? const Color(0xFFDC2626)
+                                    : const Color(0xFF2563EB))
+                                .withValues(alpha: 0.35),
+                            blurRadius: 16,
                             offset: const Offset(0, 6),
                           ),
                         ],
@@ -165,19 +175,20 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
                       'Report an Emergency',
                       style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       'Quickly submit critical incident data to emergency response teams.',
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: Colors.grey.shade600,
+                        color: const Color(0xFF94A3B8),
                       ),
                     ),
 
                     const SizedBox(height: 16),
 
-                    // Quick action categories
+                    // Quick action categories (Dark Cards)
                     GridView.count(
                       crossAxisCount: 2,
                       shrinkWrap: true,
@@ -189,36 +200,36 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
                         _buildActionTile(
                           icon: Icons.local_fire_department_rounded,
                           title: 'Fire / Hazard',
-                          color: const Color(0xFFEA580C),
+                          color: const Color(0xFFFB923C),
                         ),
                         _buildActionTile(
                           icon: Icons.water_drop_rounded,
                           title: 'Flood / Water',
-                          color: const Color(0xFF0284C7),
+                          color: const Color(0xFF38BDF8),
                         ),
                         _buildActionTile(
                           icon: Icons.medical_services_rounded,
                           title: 'Medical Aid',
-                          color: const Color(0xFFDC2626),
+                          color: const Color(0xFFF87171),
                         ),
                         _buildActionTile(
                           icon: Icons.shield_rounded,
                           title: 'Safe Shelters',
-                          color: const Color(0xFF16A34A),
+                          color: const Color(0xFF4ADE80),
                         ),
                       ],
                     ),
 
                     const SizedBox(height: 20),
 
-                    // Active responder info or civilian guidance
+                    // Active responder info or civilian guidance (Dark Card)
                     Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
+                        color: const Color(0xFF131B2E),
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                          color: Colors.grey.shade300,
+                          color: const Color(0xFF1E293B),
                         ),
                       ),
                       child: Row(
@@ -227,7 +238,7 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
                             isFirstResponder
                                 ? Icons.cell_tower_rounded
                                 : Icons.info_outline_rounded,
-                            color: theme.colorScheme.primary,
+                            color: const Color(0xFFEF4444),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -236,6 +247,7 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
                                   ? 'Active dispatch channel: Priority alerts will trigger immediate notifications.'
                                   : 'Stay safe and follow instructions from emergency personnel in your sector.',
                               style: theme.textTheme.bodySmall?.copyWith(
+                                color: const Color(0xFFCBD5E1),
                                 height: 1.4,
                               ),
                             ),
@@ -269,16 +281,16 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
         borderRadius: BorderRadius.circular(16),
         child: Ink(
           decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.08),
+            color: const Color(0xFF131B2E),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: color.withValues(alpha: 0.2)),
+            border: Border.all(color: color.withValues(alpha: 0.35)),
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               CircleAvatar(
                 radius: 22,
-                backgroundColor: color.withValues(alpha: 0.15),
+                backgroundColor: color.withValues(alpha: 0.18),
                 child: Icon(icon, color: color, size: 24),
               ),
               const SizedBox(height: 8),
@@ -288,7 +300,7 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: 13,
-                  color: color.withValues(alpha: 0.95),
+                  color: color,
                 ),
               ),
             ],
