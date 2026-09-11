@@ -1,13 +1,70 @@
 import 'package:flutter/material.dart';
 import 'welcome_screen.dart';
+import 'incident_report_screen.dart';
 
-void main() {
+import 'services/storage_service.dart';
+
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const MyApp());
+  final storage = StorageService.instance;
+  await storage.init();
+  final isLoggedIn = await storage.isLoggedIn();
+  final savedName = await storage.getUserName();
+  final savedRole = await storage.getUserRole();
+
+  runApp(MyApp(
+    initialIsLoggedIn: isLoggedIn && (savedName != null),
+    initialUserName: savedName,
+    initialUserRole: savedRole,
+  ));
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class MyApp extends StatefulWidget {
+  final bool? initialIsLoggedIn;
+  final String? initialUserName;
+  final String? initialUserRole;
+
+  const MyApp({
+    super.key,
+    this.initialIsLoggedIn,
+    this.initialUserName,
+    this.initialUserRole,
+  });
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  late bool _isLoggedIn;
+  String? _userName;
+  String? _userRole;
+
+  @override
+  void initState() {
+    super.initState();
+    _isLoggedIn = widget.initialIsLoggedIn ?? false;
+    _userName = widget.initialUserName;
+    _userRole = widget.initialUserRole;
+
+    if (widget.initialIsLoggedIn == null) {
+      _checkLoginStatus();
+    }
+  }
+
+  Future<void> _checkLoginStatus() async {
+    final storage = StorageService.instance;
+    final loggedIn = await storage.isLoggedIn();
+    final name = await storage.getUserName();
+    final role = await storage.getUserRole();
+    if (mounted) {
+      setState(() {
+        _isLoggedIn = loggedIn && (name != null);
+        _userName = name;
+        _userRole = role;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -51,7 +108,12 @@ class MyApp extends StatelessWidget {
           elevation: 0,
         ),
       ),
-      home: const WelcomeScreen(),
+      home: _isLoggedIn
+          ? IncidentReportScreen(
+              userName: _userName,
+              userRole: _userRole,
+            )
+          : const WelcomeScreen(),
     );
   }
 }
