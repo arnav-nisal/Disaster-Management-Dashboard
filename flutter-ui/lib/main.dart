@@ -3,6 +3,7 @@ import 'welcome_screen.dart';
 import 'incident_report_screen.dart';
 
 import 'services/storage_service.dart';
+import 'services/location_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -11,6 +12,9 @@ void main() async {
   final isLoggedIn = await storage.isLoggedIn();
   final savedName = await storage.getUserName();
   final savedRole = await storage.getUserRole();
+
+  // Request location permission at app startup and pre-warm location
+  LocationService().requestStartupPermission();
 
   runApp(MyApp(
     initialIsLoggedIn: isLoggedIn && (savedName != null),

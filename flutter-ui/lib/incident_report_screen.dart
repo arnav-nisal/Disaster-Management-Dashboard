@@ -1,15 +1,22 @@
 import 'package:flutter/material.dart';
 import 'welcome_screen.dart';
 import 'services/storage_service.dart';
+import 'services/incident_api_service.dart';
+import 'services/location_service.dart';
+import 'models/incident_report.dart';
 
 class IncidentReportScreen extends StatefulWidget {
   final String? userName;
   final String? userRole;
+  final IncidentApiService? apiService;
+  final LocationService? locationService;
 
   const IncidentReportScreen({
     super.key,
     this.userName,
     this.userRole,
+    this.apiService,
+    this.locationService,
   });
 
   @override
@@ -17,88 +24,91 @@ class IncidentReportScreen extends StatefulWidget {
 }
 
 class _IncidentReportScreenState extends State<IncidentReportScreen>
-    with TickerProviderStateMixin {
-  String _name = '';
+    with SingleTickerProviderStateMixin {
+  late final TextEditingController _nameController;
+  late final TextEditingController _descriptionController;
+  late final IncidentApiService _apiService;
+  late final LocationService _locationService;
+
   String _role = 'Civilian';
   bool _isLoading = true;
+  bool _isSubmitting = false;
+
+  // Form State
+  String _selectedDisasterType = 'Flood';
+  static const List<String> _disasterTypes = [
+    'Flood',
+    'Fire',
+    'Earthquake',
+    'Medical',
+  ];
+
+  double _severityLevel = 3.0;
+
+  double? _latitude;
+  double? _longitude;
+  String? _locationAddress;
+  LocationSource _locationSource = LocationSource.gps;
+  bool _isFetchingLocation = false;
+
+  final Set<String> _selectedResources = {'Medical'};
+  static const List<String> _resourceOptions = [
+    'Medical',
+    'Food',
+    'Rescue',
+    'Water',
+  ];
 
   late final AnimationController _entranceController;
   late final Animation<Offset> _bannerSlide;
   late final Animation<double> _bannerFade;
-  late final Animation<Offset> _titleSlide;
-  late final Animation<double> _titleFade;
-  late final List<Animation<Offset>> _tileSlides;
-  late final List<Animation<double>> _tileFades;
-  late final Animation<double> _infoFade;
-  late final Animation<Offset> _infoSlide;
+  late final Animation<Offset> _formSlide;
+  late final Animation<double> _formFade;
 
   @override
   void initState() {
     super.initState();
+    _apiService = widget.apiService ?? IncidentApiService();
+    _locationService = widget.locationService ?? LocationService();
+    _nameController = TextEditingController();
+    _descriptionController = TextEditingController();
+
+    // Check if location was pre-warmed at startup
+    final prewarmed = _locationService.cachedLocation;
+    if (prewarmed != null) {
+      _latitude = prewarmed.latitude;
+      _longitude = prewarmed.longitude;
+      _locationAddress = prewarmed.readableAddress;
+      _locationSource = prewarmed.source;
+    }
 
     _entranceController = AnimationController(
-      duration: const Duration(milliseconds: 900),
+      duration: const Duration(milliseconds: 700),
       vsync: this,
     );
 
-    // Banner: 0-450ms
     _bannerSlide = Tween<Offset>(
-      begin: const Offset(0, -0.15),
+      begin: const Offset(0, -0.1),
       end: Offset.zero,
     ).animate(CurvedAnimation(
       parent: _entranceController,
-      curve: const Interval(0.0, 0.45, curve: Curves.easeOutCubic),
+      curve: const Interval(0.0, 0.6, curve: Curves.easeOutCubic),
     ));
     _bannerFade = Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(
       parent: _entranceController,
-      curve: const Interval(0.0, 0.35, curve: Curves.easeOut),
+      curve: const Interval(0.0, 0.5, curve: Curves.easeOut),
     ));
 
-    // Title: 200-550ms
-    _titleSlide = Tween<Offset>(
-      begin: const Offset(0, 0.2),
+    _formSlide = Tween<Offset>(
+      begin: const Offset(0, 0.08),
       end: Offset.zero,
     ).animate(CurvedAnimation(
       parent: _entranceController,
-      curve: const Interval(0.20, 0.55, curve: Curves.easeOutCubic),
+      curve: const Interval(0.2, 1.0, curve: Curves.easeOutCubic),
     ));
-    _titleFade = Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(
+    _formFade = Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(
       parent: _entranceController,
-      curve: const Interval(0.20, 0.50, curve: Curves.easeOut),
-    ));
-
-    // Staggered cascade for category tiles (380-860ms)
-    const tileIntervals = [
-      Interval(0.38, 0.68, curve: Curves.easeOutCubic),
-      Interval(0.44, 0.74, curve: Curves.easeOutCubic),
-      Interval(0.50, 0.80, curve: Curves.easeOutCubic),
-      Interval(0.56, 0.86, curve: Curves.easeOutCubic),
-    ];
-    _tileSlides = tileIntervals.map((interval) {
-      return Tween<Offset>(
-        begin: const Offset(0, 0.18),
-        end: Offset.zero,
-      ).animate(CurvedAnimation(parent: _entranceController, curve: interval));
-    }).toList();
-
-    _tileFades = tileIntervals.map((interval) {
-      return Tween<double>(
-        begin: 0.0,
-        end: 1.0,
-      ).animate(CurvedAnimation(parent: _entranceController, curve: interval));
-    }).toList();
-
-    // Info: 650-1000ms
-    _infoSlide = Tween<Offset>(
-      begin: const Offset(0, 0.2),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _entranceController,
-      curve: const Interval(0.65, 1.0, curve: Curves.easeOutCubic),
-    ));
-    _infoFade = Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(
-      parent: _entranceController,
-      curve: const Interval(0.65, 0.95, curve: Curves.easeOut),
+      curve: const Interval(0.2, 0.8, curve: Curves.easeOut),
     ));
 
     _loadUserData();
@@ -106,6 +116,8 @@ class _IncidentReportScreenState extends State<IncidentReportScreen>
 
   @override
   void dispose() {
+    _nameController.dispose();
+    _descriptionController.dispose();
     _entranceController.dispose();
     super.dispose();
   }
@@ -113,7 +125,7 @@ class _IncidentReportScreenState extends State<IncidentReportScreen>
   Future<void> _loadUserData() async {
     if (widget.userName != null && widget.userRole != null) {
       setState(() {
-        _name = widget.userName!;
+        _nameController.text = widget.userName!;
         _role = widget.userRole!;
         _isLoading = false;
       });
@@ -126,7 +138,7 @@ class _IncidentReportScreenState extends State<IncidentReportScreen>
     final savedRole = await storage.getUserRole() ?? 'Civilian';
     if (!mounted) return;
     setState(() {
-      _name = savedName;
+      _nameController.text = savedName;
       _role = savedRole;
       _isLoading = false;
     });
@@ -151,9 +163,399 @@ class _IncidentReportScreenState extends State<IncidentReportScreen>
     );
   }
 
+  Future<void> _handleGetCurrentLocation() async {
+    setState(() => _isFetchingLocation = true);
+    try {
+      final loc = await _locationService.getCurrentLocation(forceRefresh: true);
+      if (!mounted) return;
+      setState(() {
+        _latitude = loc.latitude;
+        _longitude = loc.longitude;
+        _locationAddress = loc.readableAddress;
+        _locationSource = loc.source;
+        _isFetchingLocation = false;
+      });
+
+      final locationMsg = loc.source == LocationSource.gps
+          ? 'GPS Locked: ${loc.latitude.toStringAsFixed(4)}, ${loc.longitude.toStringAsFixed(4)}'
+          : (loc.city != null
+              ? 'Location detected: ${loc.city}, ${loc.region} (${loc.latitude.toStringAsFixed(4)}, ${loc.longitude.toStringAsFixed(4)})'
+              : 'GPS Coordinates acquired: ${loc.latitude.toStringAsFixed(4)}, ${loc.longitude.toStringAsFixed(4)}');
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(
+                loc.source == LocationSource.gps
+                    ? Icons.gps_fixed_rounded
+                    : Icons.check_circle_rounded,
+                color: const Color(0xFF22C55E),
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  locationMsg,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: const Color(0xFF131B2E),
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isFetchingLocation = false;
+        _latitude = _latitude ?? 12.9716;
+        _longitude = _longitude ?? 77.5946;
+        _locationAddress = 'Default dispatch coordinates';
+        _locationSource = LocationSource.fallback;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.info_outline_rounded,
+                  color: Color(0xFF60A5FA), size: 18),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'GPS signal unavailable. Applied default dispatch coordinates.',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: Color(0xFF1E293B),
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  void _showEditLocationDialog() {
+    final latCtrl = TextEditingController(
+      text: _latitude != null ? _latitude!.toStringAsFixed(4) : '',
+    );
+    final lngCtrl = TextEditingController(
+      text: _longitude != null ? _longitude!.toStringAsFixed(4) : '',
+    );
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF131B2E),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: Color(0xFF1E293B)),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.edit_location_alt_rounded,
+                  color: Color(0xFF60A5FA), size: 20),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Custom Coordinates',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Enter precise coordinates for the emergency site:',
+                style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: latCtrl,
+                keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true, signed: true),
+                style: const TextStyle(color: Colors.white, fontSize: 13),
+                decoration: InputDecoration(
+                  labelText: 'Latitude (-90 to 90)',
+                  labelStyle:
+                      const TextStyle(color: Color(0xFF64748B), fontSize: 12),
+                  filled: true,
+                  fillColor: const Color(0xFF0F172A),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFF1E293B)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: lngCtrl,
+                keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true, signed: true),
+                style: const TextStyle(color: Colors.white, fontSize: 13),
+                decoration: InputDecoration(
+                  labelText: 'Longitude (-180 to 180)',
+                  labelStyle:
+                      const TextStyle(color: Color(0xFF64748B), fontSize: 12),
+                  filled: true,
+                  fillColor: const Color(0xFF0F172A),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFF1E293B)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Cancel',
+                  style: TextStyle(color: Color(0xFF64748B))),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final lat = double.tryParse(latCtrl.text.trim());
+                final lng = double.tryParse(lngCtrl.text.trim());
+                if (lat != null &&
+                    lng != null &&
+                    lat >= -90 &&
+                    lat <= 90 &&
+                    lng >= -180 &&
+                    lng <= 180) {
+                  setState(() {
+                    _latitude = lat;
+                    _longitude = lng;
+                    _locationAddress = 'Custom coordinates entered';
+                    _locationSource = LocationSource.manual;
+                  });
+                  Navigator.of(ctx).pop();
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please enter valid numeric coordinates.'),
+                      backgroundColor: Color(0xFF991B1B),
+                    ),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2563EB),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text('Set Location'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _setUnknownPerson() {
+    setState(() {
+      _nameController.text = 'Unknown Person';
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.info_outline_rounded,
+                color: Color(0xFF60A5FA), size: 18),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Reporter set to "Unknown Person" for fast dispatch.',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: Color(0xFF1E293B),
+        behavior: SnackBarBehavior.floating,
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
+  Future<void> _handleSubmit() async {
+    final rawName = _nameController.text.trim();
+    final reporterName = rawName.isEmpty ? 'Unknown Person' : rawName;
+    final description = _descriptionController.text.trim();
+
+    if (description.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.error_outline_rounded,
+                  color: Color(0xFFFCA5A5), size: 18),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text('Please provide a brief description of the incident.'),
+              ),
+            ],
+          ),
+          backgroundColor: const Color(0xFF991B1B),
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+      return;
+    }
+
+    final lat = _latitude ?? 12.9716;
+    final lng = _longitude ?? 77.5946;
+
+    final report = IncidentReport(
+      reporterName: reporterName,
+      disasterType: _selectedDisasterType,
+      severityLevel: _severityLevel.toInt(),
+      latitude: lat,
+      longitude: lng,
+      description: description,
+      resourcesNeeded: _selectedResources.toList(),
+    );
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      final result = await _apiService.submitIncident(report);
+
+      // Resilient local caching via StorageService
+      await StorageService.instance.logIncident(
+        category: report.disasterType,
+        description: report.description,
+      );
+
+      if (!mounted) return;
+
+      if (result.isSuccess) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle_rounded,
+                    color: Color(0xFF22C55E), size: 18),
+                const SizedBox(width: 8),
+                Expanded(child: Text(result.message)),
+              ],
+            ),
+            backgroundColor: const Color(0xFF131B2E),
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.warning_amber_rounded,
+                    color: Color(0xFFEF4444), size: 18),
+                const SizedBox(width: 8),
+                Expanded(child: Text(result.message)),
+              ],
+            ),
+            backgroundColor: const Color(0xFF2A0D0D),
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: const Color(0xFF991B1B),
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
+  }
+
+  Color _getSeverityColor(int level) {
+    switch (level) {
+      case 1:
+        return const Color(0xFF22C55E);
+      case 2:
+        return const Color(0xFF38BDF8);
+      case 3:
+        return const Color(0xFFFBBF24);
+      case 4:
+        return const Color(0xFFFB923C);
+      case 5:
+        return const Color(0xFFEF4444);
+      default:
+        return const Color(0xFFEF4444);
+    }
+  }
+
+  String _getSeverityLabel(int level) {
+    switch (level) {
+      case 1:
+        return '1 - Minor / Advisory';
+      case 2:
+        return '2 - Moderate Hazard';
+      case 3:
+        return '3 - Significant Threat';
+      case 4:
+        return '4 - Severe Danger';
+      case 5:
+        return '5 - Critical / Catastrophic';
+      default:
+        return 'Level $level';
+    }
+  }
+
+  IconData _getDisasterIcon(String type) {
+    switch (type) {
+      case 'Flood':
+        return Icons.water_drop_rounded;
+      case 'Fire':
+        return Icons.local_fire_department_rounded;
+      case 'Earthquake':
+        return Icons.vibration_rounded;
+      case 'Medical':
+        return Icons.medical_services_rounded;
+      default:
+        return Icons.warning_rounded;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final isFirstResponder = _role == 'First Responder';
 
     return Scaffold(
@@ -162,76 +564,63 @@ class _IncidentReportScreenState extends State<IncidentReportScreen>
         backgroundColor: const Color(0xFF0B0F19),
         surfaceTintColor: Colors.transparent,
         automaticallyImplyLeading: false,
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEF4444).withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.dashboard_rounded,
-                    color: Color(0xFFEF4444), size: 18),
-              ),
-              const SizedBox(width: 10),
-              const Expanded(
-                child: Text(
-                  'Incident Dashboard',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                    fontSize: 18,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          actions: [
+        title: Row(
+          children: [
             Container(
-              margin: const EdgeInsets.only(right: 8),
+              padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: const Color(0xFF131B2E),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFF1E293B)),
+                color: const Color(0xFFEF4444).withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
               ),
-              child: IconButton(
-                tooltip: 'Logout',
-                icon: const Icon(Icons.logout_rounded,
-                    color: Color(0xFF94A3B8), size: 19),
-                onPressed: _handleLogout,
+              child: const Icon(Icons.emergency_rounded,
+                  color: Color(0xFFEF4444), size: 18),
+            ),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'Incident Report Form',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                  fontSize: 18,
+                ),
               ),
             ),
           ],
         ),
+        actions: [
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF131B2E),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFF1E293B)),
+            ),
+            child: IconButton(
+              tooltip: 'Logout',
+              icon: const Icon(Icons.logout_rounded,
+                  color: Color(0xFF94A3B8), size: 19),
+              onPressed: _handleLogout,
+            ),
+          ),
+        ],
+      ),
       body: _isLoading
-          ? Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const CircularProgressIndicator(
-                    valueColor:
-                        AlwaysStoppedAnimation<Color>(Color(0xFFEF4444)),
-                    strokeWidth: 2.5,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Loading dashboard…',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: const Color(0xFF64748B),
-                    ),
-                  ),
-                ],
+          ? const Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFEF4444)),
+                strokeWidth: 2.5,
               ),
             )
           : SafeArea(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // ── User Welcome Banner ──
+                    // ── Welcome Banner ──
                     SlideTransition(
                       position: _bannerSlide,
                       child: FadeTransition(
@@ -239,195 +628,641 @@ class _IncidentReportScreenState extends State<IncidentReportScreen>
                         child: _buildWelcomeBanner(isFirstResponder),
                       ),
                     ),
-                    const SizedBox(height: 28),
+                    const SizedBox(height: 16),
 
-                    // ── Section Title ──
+                    // ── Scrollable Incident Form Card ──
                     SlideTransition(
-                      position: _titleSlide,
+                      position: _formSlide,
                       child: FadeTransition(
-                        opacity: _titleFade,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  width: 4,
-                                  height: 22,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFEF4444),
-                                    borderRadius: BorderRadius.circular(2),
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    'Report an Emergency',
-                                    style:
-                                        theme.textTheme.titleLarge?.copyWith(
-                                      fontWeight: FontWeight.w800,
-                                      color: Colors.white,
-                                      letterSpacing: -0.3,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            Padding(
-                              padding: const EdgeInsets.only(left: 14),
-                              child: Text(
-                                'Select an emergency category to begin an incident report.',
-                                style:
-                                    theme.textTheme.bodyMedium?.copyWith(
-                                  color: const Color(0xFF64748B),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // ── Category Grid (Staggered Cascading Tiles) ──
-                    GridView.count(
-                      crossAxisCount: 2,
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                      childAspectRatio: 1.0,
-                      children: [
-                        SlideTransition(
-                          position: _tileSlides[0],
-                          child: FadeTransition(
-                            opacity: _tileFades[0],
-                            child: _buildActionTile(
-                              icon: Icons.local_fire_department_rounded,
-                              title: 'Fire / Hazard',
-                              subtitle: 'Blaze, gas leak, explosion',
-                              color: const Color(0xFFFB923C),
-                            ),
-                          ),
-                        ),
-                        SlideTransition(
-                          position: _tileSlides[1],
-                          child: FadeTransition(
-                            opacity: _tileFades[1],
-                            child: _buildActionTile(
-                              icon: Icons.water_drop_rounded,
-                              title: 'Flood / Water',
-                              subtitle: 'Overflow, storm surge',
-                              color: const Color(0xFF38BDF8),
-                            ),
-                          ),
-                        ),
-                        SlideTransition(
-                          position: _tileSlides[2],
-                          child: FadeTransition(
-                            opacity: _tileFades[2],
-                            child: _buildActionTile(
-                              icon: Icons.medical_services_rounded,
-                              title: 'Medical Aid',
-                              subtitle: 'Injury, first aid needed',
-                              color: const Color(0xFFF87171),
-                            ),
-                          ),
-                        ),
-                        SlideTransition(
-                          position: _tileSlides[3],
-                          child: FadeTransition(
-                            opacity: _tileFades[3],
-                            child: _buildActionTile(
-                              icon: Icons.night_shelter_rounded,
-                              title: 'Safe Shelters',
-                              subtitle: 'Nearby refuge points',
-                              color: const Color(0xFF4ADE80),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-
-                    // ── Status Info Card with Live Radar Pulse ──
-                    SlideTransition(
-                      position: _infoSlide,
-                      child: FadeTransition(
-                        opacity: _infoFade,
+                        opacity: _formFade,
                         child: Container(
-                          padding: const EdgeInsets.all(16),
+                          padding: const EdgeInsets.all(18),
                           decoration: BoxDecoration(
                             color: const Color(0xFF131B2E),
-                            borderRadius: BorderRadius.circular(16),
-                            border:
-                                Border.all(color: const Color(0xFF1E293B)),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(color: const Color(0xFF1E293B)),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.3),
+                                blurRadius: 20,
+                                offset: const Offset(0, 6),
+                              ),
+                            ],
                           ),
-                          child: Row(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: isFirstResponder
-                                      ? const Color(0xFFEF4444)
-                                          .withValues(alpha: 0.12)
-                                      : const Color(0xFF60A5FA)
-                                          .withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Icon(
-                                  isFirstResponder
-                                      ? Icons.cell_tower_rounded
-                                      : Icons.info_outline_rounded,
-                                  color: isFirstResponder
-                                      ? const Color(0xFFEF4444)
-                                      : const Color(0xFF60A5FA),
-                                  size: 20,
+                              // ── Reporter Name & Urgent Button ──
+                              Wrap(
+                                alignment: WrapAlignment.spaceBetween,
+                                crossAxisAlignment:
+                                    WrapCrossAlignment.center,
+                                spacing: 8,
+                                runSpacing: 4,
+                                children: [
+                                  const Text(
+                                    'REPORTER NAME',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF64748B),
+                                      letterSpacing: 1.1,
+                                    ),
+                                  ),
+                                  TextButton.icon(
+                                    onPressed: _setUnknownPerson,
+                                    style: TextButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 2),
+                                      minimumSize: Size.zero,
+                                      tapTargetSize:
+                                          MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                    icon: const Icon(Icons.flash_on_rounded,
+                                        size: 13, color: Color(0xFFEF4444)),
+                                    label: const Text(
+                                      'Urgent (Unknown)',
+                                      style: TextStyle(
+                                        color: Color(0xFFEF4444),
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              TextField(
+                                controller: _nameController,
+                                style: const TextStyle(
+                                    color: Colors.white, fontSize: 14),
+                                decoration: InputDecoration(
+                                  hintText: 'Enter reporter name',
+                                  hintStyle: const TextStyle(
+                                      color: Color(0xFF475569)),
+                                  filled: true,
+                                  fillColor: const Color(0xFF0F172A),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 14, vertical: 12),
+                                  prefixIcon: const Icon(
+                                      Icons.person_outline_rounded,
+                                      color: Color(0xFF64748B),
+                                      size: 18),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                    borderSide: const BorderSide(
+                                        color: Color(0xFF1E293B)),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                    borderSide: const BorderSide(
+                                        color: Color(0xFFEF4444), width: 1.5),
+                                  ),
                                 ),
                               ),
-                              const SizedBox(width: 14),
-                              Expanded(
+                              const SizedBox(height: 18),
+
+                              // ── Disaster Type Dropdown ──
+                              const Text(
+                                'DISASTER TYPE',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF64748B),
+                                  letterSpacing: 1.1,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              DropdownButtonFormField<String>(
+                                initialValue: _selectedDisasterType,
+                                dropdownColor: const Color(0xFF131B2E),
+                                style: const TextStyle(
+                                    color: Colors.white, fontSize: 14),
+                                icon: const Icon(Icons.arrow_drop_down_rounded,
+                                    color: Color(0xFF94A3B8)),
+                                decoration: InputDecoration(
+                                  filled: true,
+                                  fillColor: const Color(0xFF0F172A),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 14, vertical: 12),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                    borderSide: const BorderSide(
+                                        color: Color(0xFF1E293B)),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                    borderSide: const BorderSide(
+                                        color: Color(0xFFEF4444), width: 1.5),
+                                  ),
+                                ),
+                                items: _disasterTypes.map((type) {
+                                  return DropdownMenuItem<String>(
+                                    value: type,
+                                    child: Row(
+                                      children: [
+                                        Icon(_getDisasterIcon(type),
+                                            size: 18,
+                                            color: const Color(0xFFEF4444)),
+                                        const SizedBox(width: 10),
+                                        Text(type),
+                                      ],
+                                    ),
+                                  );
+                                }).toList(),
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    setState(() => _selectedDisasterType = val);
+                                  }
+                                },
+                              ),
+                              const SizedBox(height: 18),
+
+                              // ── Severity Level Slider ──
+                              Wrap(
+                                alignment: WrapAlignment.spaceBetween,
+                                crossAxisAlignment:
+                                    WrapCrossAlignment.center,
+                                spacing: 8,
+                                runSpacing: 4,
+                                children: [
+                                  const Text(
+                                    'SEVERITY LEVEL (1 - 5)',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF64748B),
+                                      letterSpacing: 1.1,
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: _getSeverityColor(
+                                              _severityLevel.toInt())
+                                          .withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(
+                                        color: _getSeverityColor(
+                                                _severityLevel.toInt())
+                                            .withValues(alpha: 0.5),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      _getSeverityLabel(_severityLevel.toInt()),
+                                      style: TextStyle(
+                                        color: _getSeverityColor(
+                                            _severityLevel.toInt()),
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              SliderTheme(
+                                data: SliderTheme.of(context).copyWith(
+                                  activeTrackColor: _getSeverityColor(
+                                      _severityLevel.toInt()),
+                                  inactiveTrackColor: const Color(0xFF1E293B),
+                                  thumbColor: _getSeverityColor(
+                                      _severityLevel.toInt()),
+                                  overlayColor: _getSeverityColor(
+                                          _severityLevel.toInt())
+                                      .withValues(alpha: 0.2),
+                                  trackHeight: 4,
+                                ),
+                                child: Slider(
+                                  value: _severityLevel,
+                                  min: 1.0,
+                                  max: 5.0,
+                                  divisions: 4,
+                                  label: _severityLevel.toInt().toString(),
+                                  onChanged: (val) {
+                                    setState(() => _severityLevel = val);
+                                  },
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+
+                              // ── Location Selector ──
+                              Wrap(
+                                alignment: WrapAlignment.spaceBetween,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  const Text(
+                                    'INCIDENT LOCATION',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF64748B),
+                                      letterSpacing: 1.1,
+                                    ),
+                                  ),
+                                  if (_latitude != null)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: (_locationSource ==
+                                                    LocationSource.gps
+                                                ? const Color(0xFF22C55E)
+                                                : (_locationSource ==
+                                                        LocationSource.manual
+                                                    ? const Color(0xFFFBBF24)
+                                                    : const Color(0xFF60A5FA)))
+                                            .withValues(alpha: 0.15),
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(
+                                          color: (_locationSource ==
+                                                      LocationSource.gps
+                                                  ? const Color(0xFF22C55E)
+                                                  : (_locationSource ==
+                                                          LocationSource.manual
+                                                      ? const Color(0xFFFBBF24)
+                                                      : const Color(
+                                                          0xFF60A5FA)))
+                                              .withValues(alpha: 0.4),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            _locationSource ==
+                                                    LocationSource.gps
+                                                ? Icons.gps_fixed_rounded
+                                                : (_locationSource ==
+                                                        LocationSource.manual
+                                                    ? Icons
+                                                        .edit_location_alt_rounded
+                                                    : Icons.public_rounded),
+                                            size: 10,
+                                            color: _locationSource ==
+                                                    LocationSource.gps
+                                                ? const Color(0xFF22C55E)
+                                                : (_locationSource ==
+                                                        LocationSource.manual
+                                                    ? const Color(0xFFFBBF24)
+                                                    : const Color(0xFF60A5FA)),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            _locationSource ==
+                                                    LocationSource.gps
+                                                ? 'LIVE GPS'
+                                                : (_locationSource ==
+                                                        LocationSource.manual
+                                                    ? 'CUSTOM'
+                                                    : 'IP NETWORK'),
+                                            style: TextStyle(
+                                              color: _locationSource ==
+                                                      LocationSource.gps
+                                                  ? const Color(0xFF22C55E)
+                                                  : (_locationSource ==
+                                                          LocationSource.manual
+                                                      ? const Color(0xFFFBBF24)
+                                                      : const Color(
+                                                          0xFF60A5FA)),
+                                              fontSize: 9.5,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF0F172A),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                      color: const Color(0xFF1E293B)),
+                                ),
                                 child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Row(
                                       children: [
-                                        Flexible(
+                                        Icon(
+                                          Icons.location_on_rounded,
+                                          size: 16,
+                                          color: _latitude != null
+                                              ? const Color(0xFF22C55E)
+                                              : const Color(0xFF60A5FA),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Expanded(
                                           child: Text(
-                                            isFirstResponder
-                                                ? 'Dispatch Active'
-                                                : 'Safety Advisory',
+                                            _latitude != null
+                                                ? 'Lat: ${_latitude!.toStringAsFixed(4)}, Long: ${_longitude!.toStringAsFixed(4)}'
+                                                : 'Coordinates not fetched',
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w700,
+                                            style: TextStyle(
+                                              color: _latitude != null
+                                                  ? Colors.white
+                                                  : const Color(0xFF94A3B8),
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    if (_locationAddress != null &&
+                                        _locationAddress!.isNotEmpty) ...[
+                                      const SizedBox(height: 4),
+                                      Row(
+                                        children: [
+                                          const SizedBox(width: 22),
+                                          Expanded(
+                                            child: Text(
+                                              _locationAddress!,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                color: Color(0xFF94A3B8),
+                                                fontSize: 11.5,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                    const SizedBox(height: 10),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: OutlinedButton.icon(
+                                            onPressed: _isFetchingLocation
+                                                ? null
+                                                : _handleGetCurrentLocation,
+                                            style: OutlinedButton.styleFrom(
+                                              foregroundColor: Colors.white,
+                                              side: const BorderSide(
+                                                  color: Color(0xFF1E293B)),
+                                              backgroundColor:
+                                                  const Color(0xFF131B2E),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      vertical: 10,
+                                                      horizontal: 8),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                              ),
+                                            ),
+                                            icon: _isFetchingLocation
+                                                ? const SizedBox(
+                                                    width: 14,
+                                                    height: 14,
+                                                    child:
+                                                        CircularProgressIndicator(
+                                                      strokeWidth: 1.8,
+                                                      valueColor:
+                                                          AlwaysStoppedAnimation<
+                                                                  Color>(
+                                                              Colors.white),
+                                                    ),
+                                                  )
+                                                : const Icon(
+                                                    Icons.my_location_rounded,
+                                                    size: 15,
+                                                    color: Color(0xFF60A5FA),
+                                                  ),
+                                            label: Text(
+                                              _latitude != null
+                                                  ? 'Refresh Location'
+                                                  : 'Get Current Location',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                fontSize: 11.5,
+                                                fontWeight: FontWeight.w600,
+                                              ),
                                             ),
                                           ),
                                         ),
                                         const SizedBox(width: 8),
-                                        _LiveRadarBeacon(
-                                          color: isFirstResponder
-                                              ? const Color(0xFFEF4444)
-                                              : const Color(0xFF22C55E),
+                                        OutlinedButton.icon(
+                                          onPressed: _showEditLocationDialog,
+                                          style: OutlinedButton.styleFrom(
+                                            foregroundColor:
+                                                const Color(0xFF94A3B8),
+                                            side: const BorderSide(
+                                                color: Color(0xFF1E293B)),
+                                            backgroundColor:
+                                                const Color(0xFF131B2E),
+                                            padding: const EdgeInsets.symmetric(
+                                                vertical: 10, horizontal: 10),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                          ),
+                                          icon: const Icon(
+                                            Icons.edit_location_alt_rounded,
+                                            size: 15,
+                                            color: Color(0xFF94A3B8),
+                                          ),
+                                          label: const Text(
+                                            'Custom',
+                                            style: TextStyle(
+                                              fontSize: 11.5,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
                                         ),
                                       ],
                                     ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      isFirstResponder
-                                          ? 'Priority alerts will trigger immediate push notifications.'
-                                          : 'Follow instructions from local emergency personnel.',
-                                      style: theme.textTheme.bodySmall
-                                          ?.copyWith(
-                                        color: const Color(0xFF94A3B8),
-                                        height: 1.4,
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 18),
+
+                              // ── Description Field ──
+                              const Text(
+                                'DESCRIPTION',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF64748B),
+                                  letterSpacing: 1.1,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              TextField(
+                                controller: _descriptionController,
+                                minLines: 3,
+                                maxLines: 5,
+                                style: const TextStyle(
+                                    color: Colors.white, fontSize: 13.5),
+                                decoration: InputDecoration(
+                                  hintText:
+                                      'Describe the emergency situation, visible hazards, stranded victims, immediate threats...',
+                                  hintStyle: const TextStyle(
+                                      color: Color(0xFF475569), fontSize: 12.5),
+                                  filled: true,
+                                  fillColor: const Color(0xFF0F172A),
+                                  contentPadding: const EdgeInsets.all(12),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                    borderSide: const BorderSide(
+                                        color: Color(0xFF1E293B)),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                    borderSide: const BorderSide(
+                                        color: Color(0xFFEF4444), width: 1.5),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 18),
+
+                              // ── Resources Needed (Multi-Select Checkboxes) ──
+                              const Text(
+                                'RESOURCES NEEDED',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF64748B),
+                                  letterSpacing: 1.1,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: _resourceOptions.map((res) {
+                                  final isSelected =
+                                      _selectedResources.contains(res);
+                                  return InkWell(
+                                    onTap: () {
+                                      setState(() {
+                                        if (isSelected) {
+                                          _selectedResources.remove(res);
+                                        } else {
+                                          _selectedResources.add(res);
+                                        }
+                                      });
+                                    },
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: isSelected
+                                            ? const Color(0xFFEF4444)
+                                                .withValues(alpha: 0.12)
+                                            : const Color(0xFF0F172A),
+                                        borderRadius:
+                                            BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: isSelected
+                                              ? const Color(0xFFEF4444)
+                                              : const Color(0xFF1E293B),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          SizedBox(
+                                            width: 18,
+                                            height: 18,
+                                            child: Checkbox(
+                                              value: isSelected,
+                                              activeColor:
+                                                  const Color(0xFFEF4444),
+                                              checkColor: Colors.white,
+                                              materialTapTargetSize:
+                                                  MaterialTapTargetSize
+                                                      .shrinkWrap,
+                                              visualDensity:
+                                                  VisualDensity.compact,
+                                              onChanged: (val) {
+                                                setState(() {
+                                                  if (val == true) {
+                                                    _selectedResources.add(res);
+                                                  } else {
+                                                    _selectedResources
+                                                        .remove(res);
+                                                  }
+                                                });
+                                              },
+                                            ),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            res,
+                                            style: TextStyle(
+                                              color: isSelected
+                                                  ? Colors.white
+                                                  : const Color(0xFF94A3B8),
+                                              fontWeight: isSelected
+                                                  ? FontWeight.w700
+                                                  : FontWeight.w500,
+                                              fontSize: 12.5,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                  ],
+                                  );
+                                }).toList(),
+                              ),
+                              const SizedBox(height: 22),
+
+                              // ── Submit Button ──
+                              SizedBox(
+                                width: double.infinity,
+                                height: 48,
+                                child: ElevatedButton(
+                                  onPressed:
+                                      _isSubmitting ? null : _handleSubmit,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFFDC2626),
+                                    foregroundColor: Colors.white,
+                                    disabledBackgroundColor:
+                                        const Color(0xFFDC2626)
+                                            .withValues(alpha: 0.5),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    elevation: 0,
+                                  ),
+                                  child: _isSubmitting
+                                      ? const SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2.0,
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                                    Colors.white),
+                                          ),
+                                        )
+                                      : const Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Icon(Icons.send_rounded, size: 16),
+                                            SizedBox(width: 8),
+                                            Text(
+                                              'Submit',
+                                              style: TextStyle(
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.w700,
+                                                letterSpacing: 0.3,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                 ),
                               ),
                             ],
@@ -439,12 +1274,16 @@ class _IncidentReportScreenState extends State<IncidentReportScreen>
                 ),
               ),
             ),
-      );
+    );
   }
 
   Widget _buildWelcomeBanner(bool isFirstResponder) {
+    final displayName = _nameController.text.trim().isEmpty
+        ? 'Unknown Person'
+        : _nameController.text.trim();
+
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: isFirstResponder
@@ -453,338 +1292,60 @@ class _IncidentReportScreenState extends State<IncidentReportScreen>
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
             color: (isFirstResponder
                     ? const Color(0xFFDC2626)
                     : const Color(0xFF2563EB))
-                .withValues(alpha: 0.3),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
+                .withValues(alpha: 0.25),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
       child: Row(
         children: [
-          // Avatar with subtle ring
-          Container(
-            padding: const EdgeInsets.all(3),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.3),
-                width: 2,
-              ),
-            ),
-            child: CircleAvatar(
-              radius: 24,
-              backgroundColor: Colors.white.withValues(alpha: 0.15),
-              child: Icon(
-                isFirstResponder
-                    ? Icons.local_hospital_rounded
-                    : Icons.person_rounded,
-                color: Colors.white,
-                size: 26,
-              ),
+          CircleAvatar(
+            radius: 20,
+            backgroundColor: Colors.white.withValues(alpha: 0.2),
+            child: Icon(
+              isFirstResponder
+                  ? Icons.local_hospital_rounded
+                  : Icons.person_rounded,
+              color: Colors.white,
+              size: 20,
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Welcome, $_name',
+                  'Welcome, $displayName',
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 19,
+                    fontSize: 16,
                     fontWeight: FontWeight.w700,
-                    letterSpacing: -0.3,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 6),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 6,
-                        height: 6,
-                        decoration: BoxDecoration(
-                          color: isFirstResponder
-                              ? const Color(0xFFFCA5A5)
-                              : const Color(0xFF93C5FD),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Flexible(
-                        child: Text(
-                          _role.toUpperCase(),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10.5,
-                            letterSpacing: 1.3,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                    ],
+                const SizedBox(height: 2),
+                Text(
+                  _role.toUpperCase(),
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.8),
+                    fontSize: 10,
+                    letterSpacing: 1.1,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildActionTile({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Color color,
-  }) {
-    return _InteractiveActionTile(
-      icon: icon,
-      title: title,
-      subtitle: subtitle,
-      color: color,
-      onTap: () async {
-        await StorageService.instance.logIncident(
-          category: title,
-          description: subtitle,
-        );
-
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                Icon(icon, color: Colors.white, size: 18),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Selected: $title',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-            backgroundColor: const Color(0xFF1E293B),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10)),
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _InteractiveActionTile extends StatefulWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _InteractiveActionTile({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  State<_InteractiveActionTile> createState() => _InteractiveActionTileState();
-}
-
-class _InteractiveActionTileState extends State<_InteractiveActionTile> {
-  bool _isPressed = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedScale(
-      scale: _isPressed ? 0.95 : 1.0,
-      duration: const Duration(milliseconds: 120),
-      curve: Curves.easeOutCubic,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: widget.onTap,
-          onTapDown: (_) => setState(() => _isPressed = true),
-          onTapUp: (_) => setState(() => _isPressed = false),
-          onTapCancel: () => setState(() => _isPressed = false),
-          borderRadius: BorderRadius.circular(18),
-          splashColor: widget.color.withValues(alpha: 0.16),
-          highlightColor: widget.color.withValues(alpha: 0.08),
-          child: Ink(
-            decoration: BoxDecoration(
-              color: const Color(0xFF131B2E),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                color: _isPressed
-                    ? widget.color.withValues(alpha: 0.6)
-                    : const Color(0xFF1E293B),
-                width: _isPressed ? 1.5 : 1.0,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.25),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-                if (_isPressed)
-                  BoxShadow(
-                    color: widget.color.withValues(alpha: 0.2),
-                    blurRadius: 16,
-                  ),
-              ],
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: widget.color.withValues(alpha: 0.14),
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: widget.color.withValues(alpha: 0.2),
-                          blurRadius: 10,
-                        ),
-                      ],
-                    ),
-                    child: Icon(widget.icon, color: widget.color, size: 22),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    widget.title,
-                    textAlign: TextAlign.center,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    widget.subtitle,
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 10.5,
-                      color: Color(0xFF64748B),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _LiveRadarBeacon extends StatefulWidget {
-  final Color color;
-  const _LiveRadarBeacon({required this.color});
-
-  @override
-  State<_LiveRadarBeacon> createState() => _LiveRadarBeaconState();
-}
-
-class _LiveRadarBeaconState extends State<_LiveRadarBeacon>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Animation<double> _scale;
-  late final Animation<double> _opacity;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 1800),
-      vsync: this,
-    )..repeat();
-
-    _scale = Tween<double>(begin: 1.0, end: 2.4).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutQuad),
-    );
-    _opacity = Tween<double>(begin: 0.8, end: 0.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutQuad),
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return RepaintBoundary(
-      child: SizedBox(
-        width: 14,
-        height: 14,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            AnimatedBuilder(
-              animation: _controller,
-              builder: (context, _) => Transform.scale(
-                scale: _scale.value,
-                child: Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: widget.color.withValues(alpha: _opacity.value * 0.5),
-                  ),
-                ),
-              ),
-            ),
-            Container(
-              width: 7,
-              height: 7,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: widget.color,
-                boxShadow: [
-                  BoxShadow(
-                    color: widget.color.withValues(alpha: 0.6),
-                    blurRadius: 4,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
