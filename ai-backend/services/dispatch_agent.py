@@ -15,7 +15,7 @@ class DispatchAgent:
         triage: TriageAssessment,
         allocation: AllocationPlan
     ) -> str:
-        loc = incident.location or f"({incident.latitude:.4f}, {incident.longitude:.4f})"
+        loc = getattr(incident, "location", None) or f"({incident.latitude:.4f}, {incident.longitude:.4f})"
         brief = gemini_service.generate_dispatch_brief(
             category=incident.disaster_type,
             location=loc,

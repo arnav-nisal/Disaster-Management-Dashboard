@@ -1,22 +1,75 @@
-from typing import Dict, Optional, Any, Literal
-from pydantic import BaseModel, Field
+import re
+from typing import Dict, Optional, Any, Literal, List
+from pydantic import BaseModel, Field, ConfigDict, model_validator
 
 
 UrgencyLevel = Literal["Critical", "High", "Medium", "Low"]
 
 
 class IncidentCreate(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    reporter_name: str = Field(..., description="Name of the person reporting the incident")
     disaster_type: str = Field(..., description="Type of disaster, e.g., earthquake, flood, wildfire")
-    description: str = Field(default="", description="Raw incident description or dispatch report")
-    severity_scale: int = Field(..., ge=1, le=10, description="Severity rating from 1 to 10")
-    latitude: float = Field(default=0.0, ge=-90.0, le=90.0, description="Latitude of the incident")
-    longitude: float = Field(default=0.0, ge=-180.0, le=180.0, description="Longitude of the incident")
-    location: str = Field(default="", description="Human-readable location or address")
-    affected_count: int = Field(default=0, ge=0, description="Estimated number of affected individuals")
-    requested_resources: Dict[str, int] = Field(
-        default_factory=dict,
-        description="Dictionary of requested resources (e.g. food, water, medical, rescue)"
+    severity_level: int = Field(..., ge=1, le=10, description="Severity rating from 1 to 10")
+    latitude: float = Field(..., ge=-90.0, le=90.0, description="Latitude of the incident")
+    longitude: float = Field(..., ge=-180.0, le=180.0, description="Longitude of the incident")
+    description: str = Field(..., description="Raw incident description or dispatch report")
+    resources_needed: List[str] = Field(
+        ...,
+        description="List of resources needed (e.g. ['food', 'water', 'medical', 'rescue'])"
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def map_legacy_fields(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            data = dict(data)
+            # Map legacy severity_scale -> severity_level
+            if "severity_level" not in data and "severity_scale" in data:
+                data["severity_level"] = data["severity_scale"]
+            # Map legacy requested_resources -> resources_needed
+            if "resources_needed" not in data:
+                if "requested_resources" in data:
+                    req = data["requested_resources"]
+                    if isinstance(req, dict):
+                        data["resources_needed"] = [f"{k}:{v}" for k, v in req.items()]
+                    elif isinstance(req, list):
+                        data["resources_needed"] = req
+                else:
+                    data["resources_needed"] = []
+            # Fallback for reporter_name if legacy sender or anonymous
+            if "reporter_name" not in data:
+                data["reporter_name"] = data.get("sender") or "Anonymous"
+            if "description" not in data:
+                data["description"] = ""
+        return data
+
+    @property
+    def location(self) -> str:
+        return f"({self.latitude:.4f}, {self.longitude:.4f})"
+
+    @property
+    def severity_scale(self) -> int:
+        return self.severity_level
+
+    @property
+    def affected_count(self) -> int:
+        return 0
+
+    @property
+    def requested_resources(self) -> Dict[str, int]:
+        res: Dict[str, int] = {}
+        for item in self.resources_needed:
+            if not isinstance(item, str):
+                continue
+            item_clean = item.strip()
+            match = re.match(r"^([a-zA-Z_]+)\s*[:=]\s*(\d+)$", item_clean)
+            if match:
+                res[match.group(1).lower()] = int(match.group(2))
+            elif item_clean:
+                res[item_clean.lower()] = 10
+        return res
 
 
 class TriageAssessment(BaseModel):

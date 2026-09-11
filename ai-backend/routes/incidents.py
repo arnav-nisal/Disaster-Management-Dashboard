@@ -49,7 +49,7 @@ def process_incident_pipeline(incident: IncidentCreate) -> IncidentResponse:
     )
 
     # 2. Deterministic Allocation Engine
-    loc = incident.location or f"({incident.latitude:.4f}, {incident.longitude:.4f})"
+    loc = getattr(incident, "location", None) or f"({incident.latitude:.4f}, {incident.longitude:.4f})"
     allocation = allocation_engine.allocate(
         incident_id=incident_id,
         category=incident.disaster_type,

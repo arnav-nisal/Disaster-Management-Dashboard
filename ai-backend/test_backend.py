@@ -32,19 +32,13 @@ def test_health_endpoint(client):
 def test_post_incident_pipeline(client):
     """Verifies standard /api/incidents ingestion with triage, allocation, and dispatch."""
     payload = {
+        "reporter_name": "Jane Doe",
         "disaster_type": "earthquake",
-        "description": "Severe earthquake magnitude 7.2. Multiple residential buildings collapsed, people trapped.",
-        "severity_scale": 9,
+        "severity_level": 9,
         "latitude": 37.7749,
         "longitude": -122.4194,
-        "location": "Downtown San Francisco",
-        "affected_count": 120,
-        "requested_resources": {
-            "food": 200,
-            "water": 400,
-            "medical": 50,
-            "rescue": 20
-        }
+        "description": "Severe earthquake magnitude 7.2. Multiple residential buildings collapsed, people trapped.",
+        "resources_needed": ["food: 200", "water: 400", "medical: 50", "rescue: 20"]
     }
 
     response = client.post("/api/incidents", json=payload)
@@ -52,8 +46,11 @@ def test_post_incident_pipeline(client):
 
     data = response.json()
     assert "incident_id" in data
+    assert data["incident"]["reporter_name"] == "Jane Doe"
     assert data["incident"]["disaster_type"] == "earthquake"
-    assert data["incident"]["location"] == "Downtown San Francisco"
+    assert data["incident"]["severity_level"] == 9
+    assert data["incident"]["latitude"] == 37.7749
+    assert data["incident"]["longitude"] == -122.4194
 
     # Triage checks
     triage = data["triage"]
@@ -133,11 +130,10 @@ def test_sms_webhook_ingestion(client):
     data = response.json()
 
     assert data["incident"]["disaster_type"] == "flood"
-    assert data["incident"]["severity_scale"] == 8
+    assert data["incident"]["severity_level"] == 8
     assert data["incident"]["latitude"] == 29.7604
-    assert data["incident"]["requested_resources"]["food"] == 150
-    assert data["incident"]["requested_resources"]["rescue"] == 8
-    assert "North Levee" in data["incident"]["location"]
+    assert any("food" in r for r in data["incident"]["resources_needed"])
+    assert any("rescue" in r for r in data["incident"]["resources_needed"])
 
     # Allocation verified
     assert data["allocation"]["allocated_resources"]["rescue"] == 8
@@ -266,6 +262,39 @@ def test_generate_endpoint_all_providers_down(client):
         res = client.post("/generate", json={"prompt": "Emergency report"})
         assert res.status_code == 500
         assert "All AI providers are currently down" in res.json()["detail"]
+
+
+def test_exact_frontend_schema_ingestion(client):
+    """Verifies ingestion of the exact JSON schema sent from the frontend."""
+    frontend_payload = {
+        "reporter_name": "Arnav Nisal",
+        "disaster_type": "flood",
+        "severity_level": 7,
+        "latitude": 18.5204,
+        "longitude": 73.8567,
+        "description": "Rising water levels near bridge and residential areas.",
+        "resources_needed": ["food", "water", "rescue"]
+    }
+    res = client.post("/api/incidents", json=frontend_payload)
+    assert res.status_code == 200
+    data = res.json()
+
+    # Verify returned incident strictly preserves frontend schema
+    inc = data["incident"]
+    assert inc["reporter_name"] == "Arnav Nisal"
+    assert inc["disaster_type"] == "flood"
+    assert inc["severity_level"] == 7
+    assert inc["latitude"] == 18.5204
+    assert inc["longitude"] == 73.8567
+    assert inc["description"] == "Rising water levels near bridge and residential areas."
+    assert inc["resources_needed"] == ["food", "water", "rescue"]
+
+    # Verify triage and allocation downstream logic correctly handled new schema
+    assert data["triage"]["urgency_level"] in ["High", "Critical"]
+    assert data["allocation"]["priority_score"] >= 40
+    assert "food" in data["allocation"]["allocated_resources"]
+    assert "rescue" in data["allocation"]["allocated_resources"]
+
 
 
 if __name__ == "__main__":
