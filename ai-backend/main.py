@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 from routes.incidents import router as incidents_router
 from routes.sms import router as sms_router
+from routes.oob_sms import router as oob_sms_router
 from services.gemini_service import gemini_service
 
 logging.basicConfig(level=logging.INFO)
@@ -28,6 +29,7 @@ app.add_middleware(
 # Register routers
 app.include_router(incidents_router)
 app.include_router(sms_router)
+app.include_router(oob_sms_router)
 
 
 class PromptRequest(BaseModel):

@@ -268,6 +268,85 @@ def test_generate_endpoint_all_providers_down(client):
         assert "All AI providers are currently down" in res.json()["detail"]
 
 
+def test_textbee_oob_webhook_success(client):
+    """Verifies parsing of Textbee compressed OOB payload, state execution, and audit log."""
+    # First seed an incident and allocation
+    inc_res = client.post("/api/incidents", json={
+        "disaster_type": "flood",
+        "description": "Rising waters downtown",
+        "severity_scale": 7,
+        "latitude": 30.2672,
+        "longitude": -97.7431,
+        "location": "Sector 4",
+        "affected_count": 20,
+        "requested_resources": {"rescue": 4}
+    })
+    assert inc_res.status_code == 200
+    incident_id = inc_res.json()["incident_id"]
+
+    # Textbee Webhook sending compressed OOB payload: OOB:UST:<incident_id>:CMP:66DF2B80:A9B1
+    payload = {
+        "smsId": "textbee_sms_987123",
+        "sender": "+15552345678",
+        "message": f"OOB:UST:{incident_id}:CMP:66DF2B80:A9B1",
+        "webhookEvent": "MESSAGE_RECEIVED"
+    }
+
+    res = client.post("/api/oob/textbee-webhook", json=payload)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "PROCESSED"
+    assert data["action"] == "update_status"
+    assert data["entity_id"] == incident_id
+    assert data["new_status"] == "completed"
+
+    # Verify state was updated in firestore_service
+    incident = firestore_service.get_incident(incident_id)
+    assert incident["status"] == "Completed"
+
+
+def test_textbee_oob_webhook_idempotency_drop(client):
+    """Verifies duplicate Textbee delivery with identical compound nonce is ignored."""
+    payload = {
+        "smsId": "textbee_sms_111222",
+        "sender": "+15559998888",
+        "message": "OOB:UST:order_777:CMP:66DF2B80:DEAD",
+        "webhookEvent": "MESSAGE_RECEIVED"
+    }
+
+    res1 = client.post("/api/oob/textbee-webhook", json=payload)
+    assert res1.status_code == 200
+    assert res1.json()["status"] == "PROCESSED"
+
+    # Resend exact duplicate SMS (e.g. cellular retry)
+    res2 = client.post("/api/oob/textbee-webhook", json=payload)
+    assert res2.status_code == 200
+    assert res2.json()["status"] == "DUPLICATE_IGNORED"
+
+
+def test_textbee_oob_webhook_ignore_non_message_events(client):
+    """Verifies that gateway events other than MESSAGE_RECEIVED or non-OOB messages are ignored."""
+    # 1. Non-MESSAGE_RECEIVED
+    res1 = client.post("/api/oob/textbee-webhook", json={
+        "smsId": "textbee_sms_333",
+        "sender": "+15551112222",
+        "message": "OOB:UST:order_999:CMP:66DF2B80:BEEF",
+        "webhookEvent": "SMS_SENT"
+    })
+    assert res1.status_code == 200
+    assert res1.json()["status"] == "IGNORED"
+
+    # 2. Regular chatter (non-OOB message)
+    res2 = client.post("/api/oob/textbee-webhook", json={
+        "smsId": "textbee_sms_444",
+        "sender": "+15551112222",
+        "message": "Hey are we still meeting?",
+        "webhookEvent": "MESSAGE_RECEIVED"
+    })
+    assert res2.status_code == 200
+    assert res2.json()["status"] == "IGNORED"
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(pytest.main(["-v", __file__]))

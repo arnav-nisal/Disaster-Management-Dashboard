@@ -119,14 +119,18 @@ class GeminiService:
         """
         Triage with cascading AI fallback: Groq -> Gemini -> NVIDIA NIM -> Rule-based.
         """
+        reporter_name = getattr(incident, "reporter_name", "Anonymous Reporter")
+        severity_scale = getattr(incident, "severity_scale", getattr(incident, "severity_level", 5))
+        requested_resources = getattr(incident, "requested_resources", {})
+
         prompt = f"""
 You are an emergency response triage coordinator. Analyze this disaster incident and return ONLY valid JSON:
 Disaster Type: {incident.disaster_type}
-Reporter Name: {incident.reporter_name}
-Severity Level (1-10): {incident.severity_level}
+Reporter Name: {reporter_name}
+Severity Level (1-10): {severity_scale}
 Latitude: {incident.latitude}, Longitude: {incident.longitude}
 Description: {incident.description}
-Resources Needed: {json.dumps(incident.resources_needed)}
+Resources Needed: {json.dumps(requested_resources)}
 Is Duplicate: {is_duplicate}
 
 Schema:
@@ -227,7 +231,8 @@ Schema:
         return f"Deploy emergency units immediately to {loc_str} for {category} response with committed assets ({res_summary}) under Priority {priority} protocol."
 
     def _rule_based_triage(self, incident: IncidentCreate, is_duplicate: bool = False, fallback_reason: Optional[str] = None) -> TriageAssessment:
-        base_score = incident.severity_level * 7
+        severity_val = getattr(incident, "severity_scale", getattr(incident, "severity_level", 5))
+        base_score = severity_val * 7
         affected_count = getattr(incident, "affected_count", 0)
         if affected_count > 500:
             count_factor = 25
@@ -235,9 +240,9 @@ Schema:
             count_factor = 18
         elif affected_count > 20:
             count_factor = 10
-        elif incident.severity_level >= 8:
+        elif severity_val >= 8:
             count_factor = 15
-        elif incident.severity_level >= 5:
+        elif severity_val >= 5:
             count_factor = 10
         else:
             count_factor = 5
@@ -250,38 +255,45 @@ Schema:
         if is_duplicate:
             calculated_priority = max(1, calculated_priority - 20)
 
-        if calculated_priority >= 80 or incident.severity_level >= 8:
+        if calculated_priority >= 80 or severity_val >= 8:
             urgency_level = "Critical"
-        elif calculated_priority >= 60 or incident.severity_level >= 6:
+        elif calculated_priority >= 60 or severity_val >= 6:
             urgency_level = "High"
-        elif calculated_priority >= 40 or incident.severity_level >= 4:
+        elif calculated_priority >= 40 or severity_val >= 4:
             urgency_level = "Medium"
         else:
             urgency_level = "Low"
 
-        # Map resources_needed (list of strings) to verified_needs (Dict[str, int])
+        # Map requested_resources or resources_needed to verified_needs
         standard_keys = ["food", "water", "medical", "rescue"]
         parsed_needs: Dict[str, int] = {}
         default_resource_qtys = {
-            "food": max(10, incident.severity_level * 20),
-            "water": max(20, incident.severity_level * 40),
-            "medical": max(5, incident.severity_level * 5),
-            "rescue": max(2, int(incident.severity_level * 2))
+            "food": max(10, severity_val * 20),
+            "water": max(20, severity_val * 40),
+            "medical": max(5, severity_val * 5),
+            "rescue": max(2, int(severity_val * 2))
         }
 
-        for item in incident.resources_needed:
-            if not isinstance(item, str):
-                continue
-            item_clean = item.strip()
-            if not item_clean:
-                continue
-            match = re.match(r"^([a-zA-Z_]+)\s*[:=]\s*(\d+)$", item_clean)
-            if match:
-                res_key = match.group(1).lower()
-                parsed_needs[res_key] = int(match.group(2))
-            else:
-                res_key = item_clean.lower()
-                parsed_needs[res_key] = default_resource_qtys.get(res_key, 10)
+        # Check requested_resources (dict) first
+        req_res = getattr(incident, "requested_resources", None)
+        if isinstance(req_res, dict) and req_res:
+            for k, v in req_res.items():
+                parsed_needs[k.lower()] = int(v)
+        else:
+            res_needed = getattr(incident, "resources_needed", [])
+            for item in res_needed:
+                if not isinstance(item, str):
+                    continue
+                item_clean = item.strip()
+                if not item_clean:
+                    continue
+                match = re.match(r"^([a-zA-Z_]+)\s*[:=]\s*(\d+)$", item_clean)
+                if match:
+                    res_key = match.group(1).lower()
+                    parsed_needs[res_key] = int(match.group(2))
+                else:
+                    res_key = item_clean.lower()
+                    parsed_needs[res_key] = default_resource_qtys.get(res_key, 10)
 
         verified_needs = {}
         for key in standard_keys:
@@ -294,9 +306,10 @@ Schema:
             if key not in verified_needs:
                 verified_needs[key] = val
 
+        reporter_name = getattr(incident, "reporter_name", "Anonymous Reporter")
         reason = (
-            f"Rule-based triage applied: Severity {incident.severity_level}/10, "
-            f"Reporter: {incident.reporter_name}, Priority: {calculated_priority}/100."
+            f"Rule-based triage applied: Severity {severity_val}/10, "
+            f"Reporter: {reporter_name}, Priority: {calculated_priority}/100."
         )
         if is_duplicate:
             reason += " Flagged as duplicate report in 500m proximity."
