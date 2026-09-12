@@ -9,6 +9,8 @@ import { HumanOverrideModal } from './components/modals/HumanOverrideModal';
 import { GeneralDetailsModal } from './components/modals/GeneralDetailsModal';
 import { ToastContainer } from './components/common/ToastContainer';
 import { WelcomePage } from './components/welcome/WelcomePage';
+import { LoginPage } from './components/auth/LoginPage';
+import { SignupPage } from './components/auth/SignupPage';
 
 export const AppContent: React.FC = () => {
   const {
@@ -101,17 +103,48 @@ export const AppContent: React.FC = () => {
 };
 
 export default function App() {
+  const [authView, setAuthView] = useState<'welcome' | 'login' | 'signup'>('welcome');
   const [showDashboard, setShowDashboard] = useState(false);
   const [dashVisible, setDashVisible] = useState(false);
 
-  const handleEnter = () => {
+  const showDashboardWithTransition = () => {
     setShowDashboard(true);
     // Slight delay so the welcome exit animation runs first
     setTimeout(() => setDashVisible(true), 80);
   };
 
+  const handleEnter = () => {
+    showDashboardWithTransition();
+  };
+
   if (!showDashboard) {
-    return <WelcomePage onEnter={handleEnter} />;
+    if (authView === 'login') {
+      return (
+        <LoginPage
+          onLoginSuccess={showDashboardWithTransition}
+          onGoToSignup={() => setAuthView('signup')}
+          onBack={() => setAuthView('welcome')}
+        />
+      );
+    }
+
+    if (authView === 'signup') {
+      return (
+        <SignupPage
+          onSignupSuccess={showDashboardWithTransition}
+          onGoToLogin={() => setAuthView('login')}
+          onBack={() => setAuthView('welcome')}
+        />
+      );
+    }
+
+    return (
+      <WelcomePage
+        onEnter={handleEnter}
+        onLogin={() => setAuthView('login')}
+        onSignup={() => setAuthView('signup')}
+      />
+    );
   }
 
   return (
