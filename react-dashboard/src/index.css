@@ -4,18 +4,18 @@
 
 @layer base {
   ::-webkit-scrollbar {
-    width: 5px;
-    height: 5px;
+    width: 6px;
+    height: 6px;
   }
   ::-webkit-scrollbar-track {
-    background: transparent;
+    background: #080c14;
   }
   ::-webkit-scrollbar-thumb {
-    background: rgba(148, 163, 184, 0.18);
-    border-radius: 9999px;
+    background: #1e293b;
+    border-radius: 4px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: rgba(148, 163, 184, 0.32);
+    background: #334155;
   }
 
   html, body {
@@ -26,115 +26,99 @@
   }
 
   body {
-    /*
-     * GOVERNMENT OPS CENTER PALETTE
-     *  Base BG        : #111d2e  — warm navy charcoal (lifted, readable)
-     *  Surface panels : #172036  — slightly blue-shifted
-     *  Primary accent : #4b9eda  — professional steel blue
-     *  Secondary      : #5a8f78  — calm sage green
-     *  Alert          : #d95f5f  — muted Indian red
-     *  Warning        : #c9963d  — warm amber-gold (saffron nod)
-     *  Success        : #4caf80  — calm emerald
-     *  Text           : #dde5f2  — warm off-white
-     */
-    background-color: #111d2e;
-    color: #dde5f2;
-    font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background-color: #080c14;
+    color: #e2e8f0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Text', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   }
 }
 
 /* =========================================================
-   Liquid Glass Surfaces — Government Ops Center Edition
+   Executive Ops Surfaces - Minimal, High-Functionality, Matte
    ========================================================= */
 
 .glass-panel {
-  background: rgba(23, 34, 58, 0.78);
-  backdrop-filter: blur(28px) saturate(130%);
-  -webkit-backdrop-filter: blur(28px) saturate(130%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-top-color: rgba(255, 255, 255, 0.14);
-  box-shadow:
-    0 14px 40px 0 rgba(0, 0, 0, 0.28),
-    0 1px 2px 0 rgba(0, 0, 0, 0.18),
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.09);
+  background: #0d131f;
+  border: 1px solid #1e293b;
+  box-shadow: none;
 }
 
 .glass-panel-subtle {
-  background: rgba(23, 34, 58, 0.58);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  border: 1px solid rgba(255, 255, 255, 0.065);
-  border-top-color: rgba(255, 255, 255, 0.11);
-  box-shadow:
-    0 6px 24px -4px rgba(0, 0, 0, 0.24),
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.07);
+  background: #0a0f19;
+  border: 1px solid #1e293b;
+  box-shadow: none;
 }
 
 .glass-pill {
-  background: rgba(35, 52, 82, 0.70);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  background: #151e2e;
+  border: 1px solid #1e293b;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .glass-pill:hover {
-  background: rgba(52, 72, 108, 0.80);
-  border-color: rgba(255, 255, 255, 0.15);
+  background: #1e293b;
+  border-color: #334155;
 }
 
 .glass-modal {
-  background: rgba(14, 24, 42, 0.94);
-  backdrop-filter: blur(40px) saturate(160%);
-  -webkit-backdrop-filter: blur(40px) saturate(160%);
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  border-top-color: rgba(255, 255, 255, 0.20);
-  box-shadow:
-    0 32px 80px 0 rgba(0, 0, 0, 0.55),
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
+  background: #0d131f;
+  border: 1px solid #334155;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
 }
 
 /* =========================================================
-   Ambient Canvas Background
-   Warm navy charcoal with barely-there steel-blue & sage breath
-   Like a softly lit command center
+   Ambient Canvas Background - Solid, Deep Matte
    ========================================================= */
 .ambient-bg {
-  background:
-    radial-gradient(ellipse 70% 50% at 50% -10%,  rgba(75, 158, 218, 0.07),  transparent),
-    radial-gradient(ellipse 55% 40% at 88%  5%,   rgba(90, 143, 120, 0.055), transparent),
-    radial-gradient(ellipse 50% 55% at 10%  90%,  rgba(75, 158, 218, 0.045), transparent),
-    radial-gradient(ellipse 40% 35% at 65% 100%,  rgba(90, 143, 120, 0.03),  transparent),
-    #111d2e;
+  background-color: #080c14;
 }
 
-/* India Map — softer steel-blue tint for long-session readability */
+/* India Map */
 .tactical-base-map {
-  filter: invert(0.92) hue-rotate(200deg) brightness(0.85) contrast(1.10) saturate(0.85);
+  filter: invert(0.92) brightness(0.8) contrast(1.1);
   mix-blend-mode: screen;
-  opacity: 0.72;
-  transition: opacity 0.4s ease;
+  opacity: 0.7;
 }
 
-/* Motion */
+/* Motion - Snappy, Minimal */
 .apple-transition {
-  transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-/* Glow accents — muted, professional */
-.glow-soft-rose {
-  box-shadow: 0 0 20px -6px rgba(217, 95, 95, 0.28);
-}
-
-.glow-soft-blue {
-  box-shadow: 0 0 20px -6px rgba(75, 158, 218, 0.22);
-}
-
-/* Legacy aliases */
-.glow-soft-teal {
-  box-shadow: 0 0 20px -6px rgba(75, 158, 218, 0.22);
-}
-
+/* Clean, Non-Glow Overrides */
+.glow-soft-rose,
+.glow-soft-blue,
+.glow-soft-teal,
 .glow-soft-cyan {
-  box-shadow: 0 0 20px -6px rgba(75, 158, 218, 0.20);
+  box-shadow: none !important;
+}
+
+/* =========================================================
+   Incident Card Urgency Animations
+   ========================================================= */
+@keyframes critical-pulse {
+  0%, 100% {
+    border-color: rgba(244, 63, 94, 0.8);
+    box-shadow: 0 0 12px rgba(244, 63, 94, 0.3);
+  }
+  50% {
+    border-color: rgba(244, 63, 94, 0.3);
+    box-shadow: 0 0 4px rgba(244, 63, 94, 0.1);
+  }
+}
+
+.incident-critical-pulse {
+  animation: critical-pulse 2s ease-in-out infinite;
+  border-color: rgba(244, 63, 94, 0.8);
+}
+
+.incident-high-glow {
+  box-shadow: 0 0 15px rgba(245, 158, 11, 0.4);
+  border-color: rgba(245, 158, 11, 0.5);
+}
+
+/* =========================================================
+   Leaflet Tactical Dark Mode Filter for OSM Tiles
+   ========================================================= */
+.leaflet-tile-pane {
+  filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
 }

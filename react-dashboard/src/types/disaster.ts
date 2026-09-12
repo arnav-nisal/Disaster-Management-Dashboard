@@ -45,6 +45,13 @@ export interface Incident {
   assignedUnit: string;
   status: IncidentStatus;
   timestamp: string;
+  // Extended fields from AI backend
+  category?: string;           // e.g. 'Flood', 'Earthquake', 'Cyclone'
+  latitude?: number;
+  longitude?: number;
+  reporter_name?: string;
+  dispatch_message?: string;   // AI allocation / dispatch message
+  description?: string;
 }
 
 export type AuditLogActor = 

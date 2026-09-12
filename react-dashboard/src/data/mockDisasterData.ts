@@ -323,7 +323,10 @@ export const initialIncidents: Incident[] = [
     requestedResources: ['Rescue Boats: 14', 'Medical Kits: 220', 'Ambulances: 4'],
     assignedUnit: 'NDRF Coastal Logistics Wing',
     status: 'In Progress',
-    timestamp: '14:32:05'
+    timestamp: '14:32:05',
+    latitude: 19.8135,
+    longitude: 85.8312,
+    category: 'Cyclone'
   },
   {
     id: 'INC-8902',
@@ -332,7 +335,10 @@ export const initialIncidents: Incident[] = [
     requestedResources: ['Rescue Boats: 6', 'Ambulances: 8'],
     assignedUnit: 'USAR Battalion 2',
     status: 'Pending',
-    timestamp: '14:35:12'
+    timestamp: '14:35:12',
+    latitude: 18.9220,
+    longitude: 72.8347,
+    category: 'Flood'
   },
   {
     id: 'INC-8903',
@@ -341,7 +347,10 @@ export const initialIncidents: Incident[] = [
     requestedResources: ['Food Packs: 450', 'Medical Kits: 90'],
     assignedUnit: 'Western Maritime Rescue',
     status: 'Dispatched',
-    timestamp: '14:28:40'
+    timestamp: '14:28:40',
+    latitude: 23.2420,
+    longitude: 69.6669,
+    category: 'Cyclone'
   },
   {
     id: 'INC-8904',
@@ -350,7 +359,10 @@ export const initialIncidents: Incident[] = [
     requestedResources: ['Medical Kits: 110', 'Food Packs: 600'],
     assignedUnit: 'Northeast Flood Response',
     status: 'In Progress',
-    timestamp: '14:20:10'
+    timestamp: '14:20:10',
+    latitude: 26.2006,
+    longitude: 92.9376,
+    category: 'Flood'
   },
   {
     id: 'INC-8905',
@@ -359,7 +371,10 @@ export const initialIncidents: Incident[] = [
     requestedResources: ['Food Packs: 150', 'Ambulances: 2'],
     assignedUnit: 'Capital EOC Response',
     status: 'Pending',
-    timestamp: '14:15:30'
+    timestamp: '14:15:30',
+    latitude: 28.6139,
+    longitude: 77.2090,
+    category: 'Emergency'
   },
   {
     id: 'INC-8907',
@@ -368,7 +383,10 @@ export const initialIncidents: Incident[] = [
     requestedResources: ['Water Pumps: 8', 'Medical Kits: 65'],
     assignedUnit: 'Central Civil Defense Corps',
     status: 'In Progress',
-    timestamp: '14:12:18'
+    timestamp: '14:12:18',
+    latitude: 23.2599,
+    longitude: 77.4126,
+    category: 'Flood'
   },
   {
     id: 'INC-8906',
@@ -377,7 +395,10 @@ export const initialIncidents: Incident[] = [
     requestedResources: ['Rescue Boats: 2', 'Medical Kits: 50'],
     assignedUnit: 'Coast Guard & SDRF Wing',
     status: 'Re-allocated',
-    timestamp: '14:10:05'
+    timestamp: '14:10:05',
+    latitude: 10.8505,
+    longitude: 76.2711,
+    category: 'Landslide'
   }
 ];
 
