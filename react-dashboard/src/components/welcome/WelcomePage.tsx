@@ -12,9 +12,11 @@ import {
 
 interface WelcomePageProps {
   onEnter: () => void;
+  onLogin: () => void;
+  onSignup: () => void;
 }
 
-export const WelcomePage: React.FC<WelcomePageProps> = ({ onEnter }) => {
+export const WelcomePage: React.FC<WelcomePageProps> = ({ onEnter, onLogin, onSignup }) => {
   const [mounted, setMounted] = useState(false);
   const [exiting, setExiting] = useState(false);
   const [time, setTime] = useState(new Date());
@@ -127,31 +129,40 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({ onEnter }) => {
           28 states and 8 union territories of India.
         </p>
 
+        {/* Temporary Google entry point until Google Auth is connected */}
+        <button
+          id="btnContinueWithGoogle"
+          onClick={handleEnter}
+          title="Continue with Google"
+          className="welcome-btn-google"
+        >
+          <span className="welcome-google-mark" aria-hidden="true">G</span>
+          <span>Continue with Google</span>
+        </button>
+
         {/* ── CTA AREA ── */}
         <div className="welcome-cta-area">
 
-          {/* Greyed-out Login */}
+          {/* Login */}
           <button
-            disabled
             id="btnLogin"
-            title="Login — coming soon"
-            className="welcome-btn-grey"
+            onClick={onLogin}
+            title="Sign in with your credentials"
+            className="welcome-btn-secondary"
           >
             <Lock className="w-4 h-4" />
             <span>Login</span>
-            <span className="welcome-btn-tag">Coming Soon</span>
           </button>
 
-          {/* Greyed-out Sign Up */}
+          {/* Sign Up */}
           <button
-            disabled
             id="btnSignUp"
-            title="Sign Up — coming soon"
-            className="welcome-btn-grey"
+            onClick={onSignup}
+            title="Create a dummy account"
+            className="welcome-btn-secondary"
           >
             <UserPlus className="w-4 h-4" />
             <span>Sign Up</span>
-            <span className="welcome-btn-tag">Coming Soon</span>
           </button>
 
           {/* Active Enter System CTA */}
@@ -407,24 +418,72 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({ onEnter }) => {
           justify-content: center;
           gap: 12px;
           flex-wrap: wrap;
-          margin-top: 8px;
+          margin-top: 12px;
         }
 
-        /* Greyed out buttons */
-        .welcome-btn-grey {
+        /* Secondary auth buttons */
+        .welcome-btn-secondary {
           display: inline-flex;
           align-items: center;
           gap: 8px;
           padding: 10px 22px;
           border-radius: 12px;
           background: rgba(30, 44, 68, 0.50);
-          border: 1px solid rgba(255,255,255,0.07);
-          color: #4a5a72;
+          border: 1px solid rgba(125,182,224,0.24);
+          color: #9fc5e5;
           font-size: 13px;
           font-weight: 500;
-          cursor: not-allowed;
-          user-select: none;
-          transition: none;
+          cursor: pointer;
+          transition: all 0.24s ease;
+        }
+        .welcome-btn-secondary:hover {
+          background: rgba(75,158,218,0.14);
+          border-color: rgba(125,182,224,0.48);
+          color: #e0f0ff;
+          transform: translateY(-1px);
+        }
+        .welcome-btn-secondary:active {
+          transform: translateY(0) scale(0.98);
+        }
+
+        .welcome-btn-google {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 9px;
+          min-width: 235px;
+          padding: 10px 22px;
+          margin-top: 28px;
+          border-radius: 12px;
+          background: rgba(255,255,255,0.94);
+          border: 1px solid rgba(255,255,255,0.72);
+          color: #24364d;
+          font-size: 13px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.24s ease;
+          box-shadow: 0 4px 18px -8px rgba(0,0,0,0.5);
+        }
+        .welcome-btn-google:hover {
+          background: #ffffff;
+          border-color: #ffffff;
+          box-shadow: 0 7px 24px -8px rgba(125,182,224,0.55);
+          transform: translateY(-1px);
+        }
+        .welcome-btn-google:active {
+          transform: translateY(0) scale(0.98);
+        }
+        .welcome-google-mark {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 20px;
+          height: 20px;
+          border-radius: 50%;
+          color: #4285f4;
+          font-family: Arial, sans-serif;
+          font-size: 16px;
+          font-weight: 700;
         }
         .welcome-btn-tag {
           font-size: 10px;

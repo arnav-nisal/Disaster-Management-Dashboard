@@ -10,16 +10,14 @@ import {
   ArrowLeft,
   Chrome,
 } from 'lucide-react';
+import { collection, query, where, getDocs, addDoc } from 'firebase/firestore';
+import { db } from '../../services/firebase';
 
 interface LoginPageProps {
   onLoginSuccess: () => void;
   onGoToSignup: () => void;
   onBack: () => void;
 }
-
-/* Dummy credentials */
-const VALID_USERNAME = 'Admin';
-const VALID_PASSWORD = 'Admin123';
 
 export const LoginPage: React.FC<LoginPageProps> = ({
   onLoginSuccess,
@@ -44,14 +42,36 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     setError('');
     setLoading(true);
 
-    /* Simulate network latency */
-    await new Promise((r) => setTimeout(r, 900));
-    setLoading(false);
+    try {
+      // 1. Query Firestore for user matching the entered username and password
+      const usersRef = collection(db, 'users');
+      const q = query(
+        usersRef,
+        where('username', '==', username),
+        where('password', '==', password)
+      );
+      const querySnapshot = await getDocs(q);
 
-    if (username === VALID_USERNAME && password === VALID_PASSWORD) {
-      onLoginSuccess();
-    } else {
-      setError('Invalid credentials. Try username "Admin" and password "Admin123".');
+      // 2. Log login attempt in Firestore
+      await addDoc(collection(db, 'login_logs'), {
+        usernameAttempt: username,
+        success: !querySnapshot.empty,
+        timestamp: new Date().toISOString(),
+      });
+
+      setLoading(false);
+
+      if (!querySnapshot.empty) {
+        onLoginSuccess();
+      } else {
+        setError('Invalid credentials. Please check your username and password.');
+        setShake(true);
+        setTimeout(() => setShake(false), 600);
+      }
+    } catch (err: any) {
+      setLoading(false);
+      console.error('Firestore login error:', err);
+      setError('Connection failed. Please verify your Firebase config.');
       setShake(true);
       setTimeout(() => setShake(false), 600);
     }
@@ -317,7 +337,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           background: rgba(255,255,255,0.06);
           margin: 18px 0;
         }
-        /* Google button — disabled */
         .auth-google-btn {
           width: 100%;
           display: flex;
