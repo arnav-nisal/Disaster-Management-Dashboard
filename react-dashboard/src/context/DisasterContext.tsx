@@ -1,4 +1,6 @@
-import React, { createContext, useContext, useState, useMemo, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, ReactNode } from 'react';
+import { collection, onSnapshot, doc, updateDoc, addDoc } from 'firebase/firestore';
+import { db } from '../services/firebase';
 import { Hotspot, Resource, Incident, AuditLog, ToastMessage, IncidentStatus } from '../types/disaster';
 import { initialHotspots, initialResources, initialIncidents, initialAuditLogs } from '../data/mockDisasterData';
 
@@ -67,6 +69,36 @@ export const DisasterProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [unitFilter, setUnitFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [telemetryCoords, setTelemetryCoords] = useState<string>('20.5937° N, 78.9629° E');
+
+  // Real-time Firestore onSnapshot listener for incidents collection
+  useEffect(() => {
+    try {
+      const incidentsRef = collection(db, 'incidents');
+      const unsubscribe = onSnapshot(
+        incidentsRef,
+        (snapshot) => {
+          if (!snapshot.empty) {
+            const firestoreIncidents = snapshot.docs.map((docSnap) => ({
+              id: docSnap.id,
+              ...docSnap.data(),
+            })) as Incident[];
+            setIncidents(firestoreIncidents);
+          } else {
+            // Keep mockDisasterData as an initial fallback only if the collection is completely empty
+            setIncidents(initialIncidents);
+          }
+        },
+        (error) => {
+          console.warn('Firestore onSnapshot listener error (using mock data fallback):', error);
+          setIncidents(initialIncidents);
+        }
+      );
+
+      return () => unsubscribe();
+    } catch (err) {
+      console.warn('Error setting up Firestore onSnapshot listener:', err);
+    }
+  }, []);
 
   const showToast = (message: string, type: 'info' | 'warning' | 'success' = 'info') => {
     const id = 'toast-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5);
@@ -167,7 +199,7 @@ export const DisasterProvider: React.FC<{ children: ReactNode }> = ({ children }
     setOverrideIncident(null);
   };
 
-  const submitCommanderDirective = (payload: CommanderDirectivePayload) => {
+  const submitCommanderDirective = async (payload: CommanderDirectivePayload) => {
     setIncidents(prev => prev.map(inc => {
       if (inc.id === payload.incidentId) {
         return {
@@ -182,16 +214,40 @@ export const DisasterProvider: React.FC<{ children: ReactNode }> = ({ children }
 
     const inc = incidents.find(i => i.id === payload.incidentId);
     const locationName = inc ? inc.location : payload.incidentId;
+    const directiveMessage = `Commander Directive issued for [${locationName}]: Threat severity adjusted to ${payload.severity}/10, Status: '${payload.status}'. Order: ${payload.reason}`;
 
     addAuditLog({
       incidentId: payload.incidentId,
       actor: 'COMMANDER DIRECTIVE',
       actionType: 'INFO',
-      message: `Commander Directive issued for [${locationName}]: Threat severity adjusted to ${payload.severity}/10, Status: '${payload.status}'. Order: ${payload.reason}`
+      message: directiveMessage
     });
 
     closeOverrideModal();
     showToast(`Commander directive executed for ${payload.incidentId}`, 'success');
+
+    try {
+      const incidentDocRef = doc(db, 'incidents', payload.incidentId);
+      const updateData: Record<string, any> = {
+        severity: payload.severity,
+        status: payload.status,
+      };
+      if (payload.resources.length > 0) {
+        updateData.requestedResources = payload.resources;
+      }
+      await updateDoc(incidentDocRef, updateData);
+
+      await addDoc(collection(db, 'audit_logs'), {
+        incidentId: payload.incidentId,
+        actor: 'COMMANDER DIRECTIVE',
+        actionType: 'INFO',
+        message: directiveMessage,
+        reason: payload.reason,
+        timestamp: new Date().toISOString()
+      });
+    } catch (err) {
+      console.warn('Firestore live directive update error (fallback to local state):', err);
+    }
   };
 
   const simulateDisasterEvent = () => {
