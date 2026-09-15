@@ -34,7 +34,7 @@ export const IncidentCard: React.FC<IncidentCardProps> = ({ incident }) => {
       </div>
 
       <div className="flex flex-wrap gap-1.5">
-        {incident.requestedResources.map((r, i) => (
+        {(incident.requestedResources || []).map((r, i) => (
           <span
             key={i}
             className="px-2 py-0.5 bg-white/[0.04] text-[10px] text-slate-300 rounded-lg border border-white/[0.06]"

@@ -16,15 +16,15 @@ export const KanbanMatrix: React.FC = () => {
   const filteredIncidents = incidents.filter((inc) => {
     const matchesRegion =
       !activeRegionFilter ||
-      inc.location.toLowerCase().includes(activeRegionFilter.toLowerCase()) ||
-      activeRegionFilter.toLowerCase().includes(inc.location.toLowerCase());
+      (inc.location || '').toLowerCase().includes(activeRegionFilter.toLowerCase()) ||
+      activeRegionFilter.toLowerCase().includes((inc.location || '').toLowerCase());
 
     const matchesQuery =
       !searchQuery ||
-      inc.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      inc.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      inc.assignedUnit.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      inc.status.toLowerCase().includes(searchQuery.toLowerCase());
+      (inc.location || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (inc.id || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (inc.assignedUnit || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (inc.status || '').toLowerCase().includes(searchQuery.toLowerCase());
 
     return matchesRegion && matchesQuery;
   });

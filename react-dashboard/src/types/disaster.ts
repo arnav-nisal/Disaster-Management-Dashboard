@@ -45,6 +45,12 @@ export interface Incident {
   assignedUnit: string;
   status: IncidentStatus;
   timestamp: string;
+  category?: string;
+  latitude?: number;
+  longitude?: number;
+  reporter_name?: string;
+  dispatch_message?: string;
+  description?: string;
 }
 
 export type AuditLogActor = 

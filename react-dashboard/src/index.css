@@ -28,14 +28,14 @@
   body {
     /*
      * GOVERNMENT OPS CENTER PALETTE
-     *  Base BG        : #111d2e  — warm navy charcoal (lifted, readable)
-     *  Surface panels : #172036  — slightly blue-shifted
-     *  Primary accent : #4b9eda  — professional steel blue
-     *  Secondary      : #5a8f78  — calm sage green
-     *  Alert          : #d95f5f  — muted Indian red
-     *  Warning        : #c9963d  — warm amber-gold (saffron nod)
-     *  Success        : #4caf80  — calm emerald
-     *  Text           : #dde5f2  — warm off-white
+     *  Base BG        : #111d2e  ï¿½ warm navy charcoal (lifted, readable)
+     *  Surface panels : #172036  ï¿½ slightly blue-shifted
+     *  Primary accent : #4b9eda  ï¿½ professional steel blue
+     *  Secondary      : #5a8f78  ï¿½ calm sage green
+     *  Alert          : #d95f5f  ï¿½ muted Indian red
+     *  Warning        : #c9963d  ï¿½ warm amber-gold (saffron nod)
+     *  Success        : #4caf80  ï¿½ calm emerald
+     *  Text           : #dde5f2  ï¿½ warm off-white
      */
     background-color: #111d2e;
     color: #dde5f2;
@@ -44,7 +44,7 @@
 }
 
 /* =========================================================
-   Liquid Glass Surfaces — Government Ops Center Edition
+   Liquid Glass Surfaces ï¿½ Government Ops Center Edition
    ========================================================= */
 
 .glass-panel {
@@ -108,7 +108,7 @@
     #111d2e;
 }
 
-/* India Map — softer steel-blue tint for long-session readability */
+/* India Map ï¿½ softer steel-blue tint for long-session readability */
 .tactical-base-map {
   filter: invert(0.92) hue-rotate(200deg) brightness(0.85) contrast(1.10) saturate(0.85);
   mix-blend-mode: screen;
@@ -121,7 +121,7 @@
   transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Glow accents — muted, professional */
+/* Glow accents ï¿½ muted, professional */
 .glow-soft-rose {
   box-shadow: 0 0 20px -6px rgba(217, 95, 95, 0.28);
 }
@@ -137,4 +137,41 @@
 
 .glow-soft-cyan {
   box-shadow: 0 0 20px -6px rgba(75, 158, 218, 0.20);
+}
+
+/* Leaflet Tactical Dark Container & Inverted OSM Tiles */
+.leaflet-container {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 500px !important;
+  background-color: #111d2e !important;
+  font-family: inherit;
+}
+
+.leaflet-tile-pane {
+  filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+  -webkit-filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+/* Faded-Edge Tactical Threat Radar Circles */
+.threat-faded-outer {
+  filter: blur(10px);
+  -webkit-filter: blur(10px);
+}
+
+.threat-faded-mid {
+  filter: blur(5px);
+  -webkit-filter: blur(5px);
+}
+
+.threat-faded-core {
+  filter: blur(2px);
+  -webkit-filter: blur(2px);
+}
+
+.threat-epicenter-dot {
+  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.8));
+  -webkit-filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.8));
 }
