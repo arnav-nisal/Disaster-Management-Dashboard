@@ -15,9 +15,9 @@ export const HumanOverrideModal: React.FC = () => {
 
   useEffect(() => {
     if (overrideIncident) {
-      setSeverity(overrideIncident.severity);
-      setStatus(overrideIncident.status);
-      setResources(overrideIncident.requestedResources.join(', '));
+      setSeverity(overrideIncident.severity || 5);
+      setStatus(overrideIncident.status || 'In Progress');
+      setResources((overrideIncident.requestedResources || []).join(', '));
     }
   }, [overrideIncident]);
 

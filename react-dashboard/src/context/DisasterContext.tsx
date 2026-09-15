@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, ReactNode } from 'react';
-import { collection, onSnapshot, doc, updateDoc, addDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, addDoc, setDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { Hotspot, Resource, Incident, AuditLog, ToastMessage, IncidentStatus } from '../types/disaster';
-import { initialHotspots, initialResources, initialIncidents, initialAuditLogs } from '../data/mockDisasterData';
+import { initialHotspots, initialResources } from '../data/mockDisasterData';
 
 interface CommanderDirectivePayload {
   incidentId: string;
@@ -62,41 +62,112 @@ export const DisasterProvider: React.FC<{ children: ReactNode }> = ({ children }
   
   const [hotspots] = useState<Hotspot[]>(initialHotspots);
   const [resources] = useState<Resource[]>(initialResources);
-  const [incidents, setIncidents] = useState<Incident[]>(initialIncidents);
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>(initialAuditLogs);
+  // Pure Live Firebase Firestore State (zero static mock incidents)
+  const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [isAutoDispatchActive, setIsAutoDispatchActive] = useState<boolean>(true);
   const [unitFilter, setUnitFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [telemetryCoords, setTelemetryCoords] = useState<string>('20.5937° N, 78.9629° E');
 
-  // Real-time Firestore onSnapshot listener for incidents collection
+  // Real-time Firestore onSnapshot listener for incidents & audit_logs collections
   useEffect(() => {
     try {
       const incidentsRef = collection(db, 'incidents');
-      const unsubscribe = onSnapshot(
+      const unsubscribeIncidents = onSnapshot(
         incidentsRef,
         (snapshot) => {
-          if (!snapshot.empty) {
-            const firestoreIncidents = snapshot.docs.map((docSnap) => ({
+          const firestoreIncidents = snapshot.docs.map((docSnap) => {
+            const data = docSnap.data();
+            const rawLat = data.latitude ?? data.lat ?? data.incident?.latitude ?? data.incident?.lat;
+            const rawLng = data.longitude ?? data.lon ?? data.lng ?? data.incident?.longitude ?? data.incident?.lon ?? data.incident?.lng;
+            const lat = typeof rawLat === 'number' ? rawLat : parseFloat(rawLat);
+            const lng = typeof rawLng === 'number' ? rawLng : parseFloat(rawLng);
+
+            return {
               id: docSnap.id,
-              ...docSnap.data(),
-            })) as Incident[];
-            setIncidents(firestoreIncidents);
-          } else {
-            // Keep mockDisasterData as an initial fallback only if the collection is completely empty
-            setIncidents(initialIncidents);
-          }
+              location: data.location || data.incident?.location || data.allocation?.location || 'Operational Incident Zone',
+              severity: Number(data.severity || data.severity_level || data.incident?.severity_level || 5),
+              requestedResources: Array.isArray(data.requestedResources)
+                ? data.requestedResources
+                : Array.isArray(data.incident?.resources_needed)
+                  ? data.incident.resources_needed
+                  : [],
+              assignedUnit: data.assignedUnit || data.leadUnit || data.allocation?.dispatch_message || 'NDRF Quick Response Wing',
+              status: (data.status || data.allocation?.status || 'In Progress') as IncidentStatus,
+              timestamp: data.timestamp || new Date().toISOString(),
+              category: data.category || data.disaster_type || data.incident?.disaster_type || 'Disaster Alert',
+              latitude: !isNaN(lat) ? lat : undefined,
+              longitude: !isNaN(lng) ? lng : undefined,
+              reporter_name: data.reporter_name || data.incident?.reporter_name,
+              description: data.description || data.incident?.description,
+              ...data,
+            };
+          }) as Incident[];
+          setIncidents(firestoreIncidents);
         },
         (error) => {
-          console.warn('Firestore onSnapshot listener error (using mock data fallback):', error);
-          setIncidents(initialIncidents);
+          console.warn('Firestore incidents live sync error:', error);
         }
       );
 
-      return () => unsubscribe();
+      const auditLogsRef = collection(db, 'audit_logs');
+      const unsubscribeAudit = onSnapshot(
+        auditLogsRef,
+        (snapshot) => {
+          if (!snapshot.empty) {
+            const firestoreLogs = snapshot.docs.map((d) => {
+              const data = d.data() || {};
+              const actor = typeof data.actor === 'string' && data.actor
+                ? data.actor
+                : typeof data.event_type === 'string' && data.event_type
+                ? data.event_type.replace(/_/g, ' ')
+                : 'SYSTEM DISPATCH';
+
+              let msg = '';
+              if (typeof data.message === 'string' && data.message) {
+                msg = data.message;
+              } else if (typeof data.details?.dispatch_message === 'string' && data.details.dispatch_message) {
+                msg = data.details.dispatch_message;
+              } else if (typeof data.details?.reasoning === 'string' && data.details.reasoning) {
+                msg = data.details.reasoning;
+              } else if (typeof data.event_type === 'string') {
+                msg = `Operational event [${data.event_type}] logged for incident ${data.incident_id || ''}`;
+              } else {
+                msg = 'Operational telemetry event logged.';
+              }
+
+              const rawTime = typeof data.timestamp === 'string' ? data.timestamp : new Date().toISOString();
+              const timeDisplay = rawTime.includes('T')
+                ? rawTime.split('T')[1].slice(0, 8)
+                : rawTime.slice(0, 8);
+
+              return {
+                id: d.id,
+                incidentId: typeof data.incident_id === 'string' ? data.incident_id : typeof data.incidentId === 'string' ? data.incidentId : '',
+                timestamp: timeDisplay,
+                actor: actor,
+                actionType: (actor.includes('ALERT') ? 'ALERT' : actor.includes('WARN') ? 'WARNING' : 'INFO') as 'ALERT' | 'WARNING' | 'INFO' | 'SUCCESS',
+                message: msg,
+              };
+            }) as AuditLog[];
+
+            firestoreLogs.sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
+            setAuditLogs(firestoreLogs);
+          }
+        },
+        (error) => {
+          console.warn('Firestore audit_logs live sync error:', error);
+        }
+      );
+
+      return () => {
+        unsubscribeIncidents();
+        unsubscribeAudit();
+      };
     } catch (err) {
-      console.warn('Error setting up Firestore onSnapshot listener:', err);
+      console.warn('Error connecting to Firebase Firestore:', err);
     }
   }, []);
 
@@ -250,34 +321,44 @@ export const DisasterProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
 
-  const simulateDisasterEvent = () => {
-    const names = [
-      'Kolkata Port Delta Reach', 
-      'Bengaluru Southern Sector', 
-      'Jaipur Drainage Basin',
-      'Visakhapatnam Naval Reach',
-      'Chennai Coastal Belt'
+  const simulateDisasterEvent = async () => {
+    const disasterPresets = [
+      { location: 'Kolkata Port Delta Reach', lat: 22.5726, lng: 88.3639, category: 'Cyclone Alert', unit: 'Eastern Naval Command' },
+      { location: 'Bengaluru Southern Sector', lat: 12.9716, lng: 77.5946, category: 'Urban Flash Flood', unit: 'Karnataka Civil Defense' },
+      { location: 'Jaipur Drainage Basin', lat: 26.9124, lng: 75.7873, category: 'Flash Flood', unit: 'Rajasthan SDRF Battalion' },
+      { location: 'Visakhapatnam Naval Reach', lat: 17.6868, lng: 83.2185, category: 'Storm Surge', unit: 'Coast Guard Unit 4' },
+      { location: 'Chennai Coastal Belt', lat: 13.0827, lng: 80.2707, category: 'Tsunami Warning', unit: 'Southern Maritime Rescue' }
     ];
-    const pick = names[Math.floor(Math.random() * names.length)];
+    const pick = disasterPresets[Math.floor(Math.random() * disasterPresets.length)];
     const id = 'INC-' + (9200 + incidents.length);
     const newIncident: Incident = {
       id,
-      location: pick,
+      location: pick.location,
+      category: pick.category,
       severity: 8,
+      latitude: pick.lat,
+      longitude: pick.lng,
       requestedResources: ['Rescue Boats: 4', 'Trauma Kits: 80', 'Ambulances: 2'],
-      assignedUnit: 'NDRF Rapid Response Wing',
+      assignedUnit: pick.unit,
       status: 'Pending',
       timestamp: new Date().toTimeString().split(' ')[0]
     };
 
-    setIncidents(prev => [newIncident, ...prev]);
+    // Save live directly to Firebase Firestore
+    try {
+      await setDoc(doc(db, 'incidents', id), newIncident);
+    } catch (err) {
+      console.warn('Direct Firestore save failed, fallback to local state:', err);
+      setIncidents(prev => [newIncident, ...prev]);
+    }
+
     addAuditLog({
       incidentId: id,
       actor: 'CENTRAL DISPATCH',
       actionType: 'ALERT',
-      message: `Flash incident alert logged for ${pick}. Threat escalated to Level 8.`
+      message: `Flash incident alert logged for ${pick.location}. Threat escalated to Level 8.`
     });
-    showToast(`Emergency reported at ${pick}`, 'warning');
+    showToast(`Emergency reported at ${pick.location}`, 'warning');
   };
 
   const toggleAutoDispatch = () => {

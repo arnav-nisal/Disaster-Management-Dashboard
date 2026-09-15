@@ -1,16 +1,16 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { ChevronLeft } from 'lucide-react';
 import { useDisaster } from './context/DisasterContext';
 import { Header } from './components/header/Header';
 import { ThreatRadarMap } from './components/map/ThreatRadarMap';
 import { KanbanMatrix } from './components/kanban/KanbanMatrix';
 import { AuditLogSidebar } from './components/sidebar/AuditLogSidebar';
+import { NavigationSidebar } from './components/sidebar/NavigationSidebar';
+import { StatsCommandView } from './components/stats/StatsCommandView';
 import { HumanOverrideModal } from './components/modals/HumanOverrideModal';
 import { GeneralDetailsModal } from './components/modals/GeneralDetailsModal';
 import { ToastContainer } from './components/common/ToastContainer';
-import { WelcomePage } from './components/welcome/WelcomePage';
-import { LoginPage } from './components/auth/LoginPage';
-import { SignupPage } from './components/auth/SignupPage';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 
 export const AppContent: React.FC = () => {
   const {
@@ -21,6 +21,8 @@ export const AppContent: React.FC = () => {
   } = useDisaster();
 
   const isMapRoute = currentRoute === '/';
+  const isStatsRoute = currentRoute === '/stats';
+  const isKanbanRoute = currentRoute.startsWith('/details');
 
   // Determine active region status text
   let focusedRegionName = 'ALL REGIONS';
@@ -41,58 +43,84 @@ export const AppContent: React.FC = () => {
   }
 
   return (
-    <div className="ambient-bg text-slate-100 font-sans w-full max-w-[1920px] mx-auto flex flex-col antialiased selection:bg-teal-500 selection:text-black">
-      {/* Top Header & Branding / Network Telemetry & KPI Deck */}
-      <Header />
+    <div className="flex h-screen w-full bg-[#070c15] text-slate-100 font-sans antialiased overflow-hidden selection:bg-cyan-500 selection:text-black">
+      {/* 1. Left Operational Navigation Sidebar (UptimeRobot Inspired) */}
+      <NavigationSidebar />
 
-      {/* Main Workspace */}
-      <main className="flex-1 px-4 xl:px-6 py-4 grid grid-cols-1 xl:grid-cols-12 gap-4 items-start max-w-[1920px] mx-auto w-full pb-10">
-        {/* Left 65% Panel (Map / Kanban) */}
-        <div className="xl:col-span-8 flex flex-col gap-3.5 w-full">
-          {/* Breadcrumb Bar (When drilling into Kanban) */}
-          {!isMapRoute && (
-            <div
-              id="routeBreadcrumbBar"
-              className="flex items-center justify-between glass-panel p-3.5 rounded-2xl border border-white/[0.08] shadow-md shrink-0"
-            >
-              <div className="flex items-center gap-3 text-xs">
-                <button
-                  onClick={() => switchRoute('/')}
-                  className="flex items-center gap-2 text-cyan-300 hover:text-white glass-pill px-3 py-1.5 rounded-xl font-medium apple-transition"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                  <span>Return to Geospatial Map</span>
-                </button>
-                <span className="text-slate-500">/</span>
-                <span className="text-slate-400 font-medium">Focused Sector:</span>
-                <span
-                  id="breadcrumbRegionText"
-                  className="font-bold text-amber-300 uppercase tracking-wide"
-                >
-                  {focusedRegionName}
-                </span>
+      {/* 2. Main Workspace & View Container */}
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto bg-gradient-to-b from-[#0b1320] via-[#09101b] to-[#070c15]">
+        {/* Top Command Status Bar */}
+        <Header />
+
+        {/* Main Content Body */}
+        <main className="flex-1 p-4 xl:p-6 w-full max-w-[1920px] mx-auto">
+          {/* A. THREAT RADAR VIEW (Map + Matching Height Logs) */}
+          {isMapRoute && (
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 items-start w-full">
+              {/* Left 8 Cols: Threat Map */}
+              <div className="xl:col-span-8 w-full">
+                <ErrorBoundary fallbackTitle="Tactical Map Error">
+                  <ThreatRadarMap />
+                </ErrorBoundary>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] text-slate-400 font-medium">STATUS:</span>
-                <span
-                  id="breadcrumbRegionStatus"
-                  className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 animate-pulse"
-                >
-                  {focusedRegionStatus}
-                </span>
+
+              {/* Right 4 Cols: Compact Dispatch Logs matching map length */}
+              <div className="xl:col-span-4 w-full">
+                <ErrorBoundary fallbackTitle="Audit Logs Error">
+                  <AuditLogSidebar />
+                </ErrorBoundary>
               </div>
             </div>
           )}
 
-          {/* View Container */}
-          <div className="w-full">
-            {isMapRoute ? <ThreatRadarMap /> : <KanbanMatrix />}
-          </div>
-        </div>
+          {/* B. REGIONAL BOARD VIEW (Kanban Matrix) */}
+          {isKanbanRoute && (
+            <div className="flex flex-col gap-4 w-full">
+              {/* Breadcrumb Header */}
+              <div
+                id="routeBreadcrumbBar"
+                className="flex items-center justify-between glass-panel p-3.5 rounded-2xl border border-white/[0.08] shadow-md shrink-0"
+              >
+                <div className="flex items-center gap-3 text-xs">
+                  <button
+                    onClick={() => switchRoute('/')}
+                    className="flex items-center gap-2 text-cyan-300 hover:text-white glass-pill px-3 py-1.5 rounded-xl font-medium transition"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    <span>Return to Threat Radar</span>
+                  </button>
+                  <span className="text-slate-600">/</span>
+                  <span className="text-slate-400 font-medium">Focused Sector:</span>
+                  <span
+                    id="breadcrumbRegionText"
+                    className="font-bold text-amber-300 uppercase tracking-wide"
+                  >
+                    {focusedRegionName}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-slate-400 font-medium">STATUS:</span>
+                  <span
+                    id="breadcrumbRegionStatus"
+                    className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 animate-pulse"
+                  >
+                    {focusedRegionStatus}
+                  </span>
+                </div>
+              </div>
 
-        {/* Right 35% Sidebar: Incident Dispatch & Activity Log */}
-        <AuditLogSidebar />
-      </main>
+              <KanbanMatrix />
+            </div>
+          )}
+
+          {/* C. STATS & ANALYTICS VIEW */}
+          {isStatsRoute && (
+            <ErrorBoundary fallbackTitle="Analytics Dashboard Error">
+              <StatsCommandView />
+            </ErrorBoundary>
+          )}
+        </main>
+      </div>
 
       {/* Overlays & Modals */}
       <HumanOverrideModal />
@@ -103,59 +131,10 @@ export const AppContent: React.FC = () => {
 };
 
 export default function App() {
-  const [authView, setAuthView] = useState<'welcome' | 'login' | 'signup'>('welcome');
-  const [showDashboard, setShowDashboard] = useState(false);
-  const [dashVisible, setDashVisible] = useState(false);
-
-  const showDashboardWithTransition = () => {
-    setShowDashboard(true);
-    // Slight delay so the welcome exit animation runs first
-    setTimeout(() => setDashVisible(true), 80);
-  };
-
-  const handleEnter = () => {
-    showDashboardWithTransition();
-  };
-
-  if (!showDashboard) {
-    if (authView === 'login') {
-      return (
-        <LoginPage
-          onLoginSuccess={showDashboardWithTransition}
-          onGoToSignup={() => setAuthView('signup')}
-          onBack={() => setAuthView('welcome')}
-        />
-      );
-    }
-
-    if (authView === 'signup') {
-      return (
-        <SignupPage
-          onSignupSuccess={showDashboardWithTransition}
-          onGoToLogin={() => setAuthView('login')}
-          onBack={() => setAuthView('welcome')}
-        />
-      );
-    }
-
-    return (
-      <WelcomePage
-        onEnter={handleEnter}
-        onLogin={() => setAuthView('login')}
-        onSignup={() => setAuthView('signup')}
-      />
-    );
-  }
-
   return (
-    <div
-      style={{
-        opacity: dashVisible ? 1 : 0,
-        transform: dashVisible ? 'translateY(0)' : 'translateY(8px)',
-        transition: 'opacity 0.55s ease, transform 0.55s cubic-bezier(0.16,1,0.3,1)',
-      }}
-    >
+    <ErrorBoundary fallbackTitle="Situation Room Dashboard Error">
       <AppContent />
-    </div>
+    </ErrorBoundary>
   );
 }
+
